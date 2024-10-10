@@ -721,10 +721,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 3.4028235e+38
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -787,7 +787,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 3f7f36411154aa3698e58dc5c7cb99b8, type: 2}
     - target: {fileID: 4822342169234789232, guid: cef27ef725683a7289e9b7a4c24a784a, type: 3}
       propertyPath: m_Name
-      value: right_front_wheel_link
+      value: right_front_wheel_linkmeow
       objectReference: {fileID: 0}
     - target: {fileID: 7341558325833475685, guid: cef27ef725683a7289e9b7a4c24a784a, type: 3}
       propertyPath: m_LocalPosition.x
@@ -894,7 +894,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3891074460132916476, guid: d70b875edf8b06c7aa0a6529ff29e135, type: 3}
       propertyPath: m_Name
-      value: right_mid_wheel_link
+      value: right_mid_wheel_link_COL
       objectReference: {fileID: 0}
     - target: {fileID: 7912474785883016012, guid: d70b875edf8b06c7aa0a6529ff29e135, type: 3}
       propertyPath: m_LocalPosition.x
@@ -1059,7 +1059,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 435405306}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cc5b8ebeac2a8d34ebae97a70ba0aa87, type: 3}
   m_Name: 
@@ -1114,7 +1114,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3034258359724761641, guid: 74e2a08ed66e25a3f9cf8691174f6387, type: 3}
       propertyPath: m_Name
-      value: right_bogie_link
+      value: right_bogie_link_COLU
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 3691290072847914148, guid: 74e2a08ed66e25a3f9cf8691174f6387, type: 3}
@@ -1650,7 +1650,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4466570640192624082, guid: 56bee61c6cd808984b54097393064e62, type: 3}
       propertyPath: m_Name
-      value: back_right_wheel_link
+      value: back_right_wheel_link_MEOW
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5458488930800904389, guid: 56bee61c6cd808984b54097393064e62, type: 3}
@@ -1771,7 +1771,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3891074460132916476, guid: d70b875edf8b06c7aa0a6529ff29e135, type: 3}
       propertyPath: m_Name
-      value: right_mid_wheel_link
+      value: right_mid_wheel_linkmeow
       objectReference: {fileID: 0}
     - target: {fileID: 6670644040150518022, guid: d70b875edf8b06c7aa0a6529ff29e135, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -1983,7 +1983,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1995097109964595527, guid: 88aa65541b3ca749e975501a8b53971c, type: 3}
       propertyPath: m_Name
-      value: left_mid_wheel_link
+      value: left_mid_wheel_link_COL
       objectReference: {fileID: 0}
     - target: {fileID: 2850551583808653692, guid: 88aa65541b3ca749e975501a8b53971c, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -2527,7 +2527,6 @@ Transform:
   - {fileID: 543219114}
   - {fileID: 957297411}
   - {fileID: 1763475975}
-  - {fileID: 963194228}
   m_Father: {fileID: 946055891}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &767778395
@@ -2728,7 +2727,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5435509877478654317, guid: 0cb7824867838f88b928aae22d026ca8, type: 3}
       propertyPath: m_Name
-      value: back_left_wheel_link
+      value: back_left_wheel_link_EE
       objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 3707095265090809290, guid: 0cb7824867838f88b928aae22d026ca8, type: 3}
@@ -2838,10 +2837,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 5
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -2904,7 +2903,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: f11f0f78de30e6cb5ae6c7dd61c15e7f, type: 2}
     - target: {fileID: 3369273121459513044, guid: b073f8eae91aab81da738c587f85b179, type: 3}
       propertyPath: m_Name
-      value: left_front_wheel_link
+      value: left_front_wheel_link_EE
       objectReference: {fileID: 0}
     - target: {fileID: 6737390052217121323, guid: b073f8eae91aab81da738c587f85b179, type: 3}
       propertyPath: m_LocalPosition.x
@@ -2967,6 +2966,7 @@ GameObject:
   - component: {fileID: 946055891}
   - component: {fileID: 946055890}
   - component: {fileID: 946055889}
+  - component: {fileID: 946055892}
   m_Layer: 0
   m_Name: chassis_24
   m_TagString: robot
@@ -2981,7 +2981,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 946055888}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d607ea46a579d44c4b19a6322ce4b9b2, type: 3}
   m_Name: 
@@ -3029,6 +3029,34 @@ Transform:
   - {fileID: 767778394}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &946055892
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 946055888}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23b5260499280bde598161bbbbd3607b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  wheelJointNames:
+  - back_left_wheel_link
+  - back_right_wheel_link
+  - left_front_wheel_link
+  - left_mid_wheel_link
+  - right_front_wheel_link
+  - right_mid_wheel_link
+  wheelJoints:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  motorTopicName: /motor_commands
+  cmdVelTopicName: /cmd_vel
 --- !u!1 &947054782 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 108867634974633113, guid: d70b875edf8b06c7aa0a6529ff29e135, type: 3}
@@ -3189,7 +3217,7 @@ Camera:
   m_ShutterSpeed: 0.005
   m_Aperture: 16
   m_FocusDistance: 10
-  m_FocalLength: 50
+  m_FocalLength: 10.995974
   m_BladeCount: 5
   m_Curvature: {x: 2, y: 11}
   m_BarrelClipping: 0.25
@@ -3204,7 +3232,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 1000
-  field of view: 26.991467
+  field of view: 95
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -3230,13 +3258,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.43758446, y: 0.0028248043, z: -0.0013746988, w: 0.8991718}
-  m_LocalPosition: {x: 0.034999847, y: 0.21999931, z: -0.22800064}
+  m_LocalRotation: {x: 0.23386839, y: 0.0030544256, z: -0.0007347122, w: 0.9722632}
+  m_LocalPosition: {x: -0.035, y: 0.53, z: -0.781}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 767778394}
-  m_LocalEulerAnglesHint: {x: 51.9, y: 0.36, z: 0}
+  m_Father: {fileID: 1763475975}
+  m_LocalEulerAnglesHint: {x: 27.05, y: 0.36, z: 0}
 --- !u!1 &972627831 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6554732117785198971, guid: 0cb7824867838f88b928aae22d026ca8, type: 3}
@@ -3367,10 +3395,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 3.4028235e+38
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -3608,10 +3636,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 3.4028235e+38
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -3999,10 +4027,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 3.4028235e+38
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -4117,7 +4145,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3369273121459513044, guid: b073f8eae91aab81da738c587f85b179, type: 3}
       propertyPath: m_Name
-      value: left_front_wheel_link
+      value: left_front_wheel_link_EE
       objectReference: {fileID: 0}
     - target: {fileID: 6737390052217121323, guid: b073f8eae91aab81da738c587f85b179, type: 3}
       propertyPath: m_LocalPosition.x
@@ -4443,7 +4471,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4466570640192624082, guid: 56bee61c6cd808984b54097393064e62, type: 3}
       propertyPath: m_Name
-      value: back_right_wheel_link
+      value: back_right_wheel_link+_MEOW
       objectReference: {fileID: 0}
     - target: {fileID: 5458488930800904389, guid: 56bee61c6cd808984b54097393064e62, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -4616,6 +4644,7 @@ Transform:
   - {fileID: 1953540226}
   - {fileID: 753040741}
   - {fileID: 707883}
+  - {fileID: 963194228}
   m_Father: {fileID: 767778394}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1763475976
@@ -4985,7 +5014,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3034258359724761641, guid: 74e2a08ed66e25a3f9cf8691174f6387, type: 3}
       propertyPath: m_Name
-      value: right_bogie_link
+      value: right_bogie_link_EE
       objectReference: {fileID: 0}
     - target: {fileID: 3691290072847914148, guid: 74e2a08ed66e25a3f9cf8691174f6387, type: 3}
       propertyPath: m_Materials.Array.data[0]
@@ -5140,10 +5169,10 @@ ArticulationBody:
     upperLimit: 0
     stiffness: 0
     damping: 0
-    forceLimit: 3.4028235e+38
+    forceLimit: 50
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -5519,7 +5548,7 @@ GameObject:
   - component: {fileID: 1992395888}
   - component: {fileID: 1992395889}
   m_Layer: 0
-  m_Name: unnamed
+  m_Name: unnamed_
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5661,7 +5690,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 4822342169234789232, guid: cef27ef725683a7289e9b7a4c24a784a, type: 3}
       propertyPath: m_Name
-      value: right_front_wheel_link
+      value: right_front_wheel_link_EE
       objectReference: {fileID: 0}
     - target: {fileID: 7341558325833475685, guid: cef27ef725683a7289e9b7a4c24a784a, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5882,7 +5911,7 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: 3f7f36411154aa3698e58dc5c7cb99b8, type: 2}
     - target: {fileID: 5435509877478654317, guid: 0cb7824867838f88b928aae22d026ca8, type: 3}
       propertyPath: m_Name
-      value: back_left_wheel_link
+      value: back_left_wheel_link_EE
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -5904,7 +5933,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1995097109964595527, guid: 88aa65541b3ca749e975501a8b53971c, type: 3}
       propertyPath: m_Name
-      value: left_mid_wheel_link
+      value: left_mid_wheel_link_COL
       objectReference: {fileID: 0}
     - target: {fileID: 8717851704935192614, guid: 88aa65541b3ca749e975501a8b53971c, type: 3}
       propertyPath: m_LocalPosition.x
