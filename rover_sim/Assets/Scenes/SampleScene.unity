@@ -3041,6 +3041,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 23b5260499280bde598161bbbbd3607b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  motor_dirs: 010000000100000001000000010000000100000001000000
   wheelJointNames:
   - back_left_wheel_link
   - back_right_wheel_link

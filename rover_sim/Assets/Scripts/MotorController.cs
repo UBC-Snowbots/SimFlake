@@ -5,9 +5,14 @@ using ROS2;
 using System;
 // using GameObject;
 
+//TODO Figure out
+    //? Unity uses degrees or rads?
+    //? 
+
 // Import ROS2 message types with aliases to avoid conflicts
 // using std_msgs = std_msgs.msg;
 // using geometry_msgs = geometry_msgs.msg;
+
 
 public class MotorController : MonoBehaviour
 {
@@ -22,6 +27,16 @@ public class MotorController : MonoBehaviour
         ROS2UnityCore ros2Unity = new ROS2UnityCore();
 
     // Wheel joint names in the same order as motor commands
+    [SerializeField]
+    private int[] motor_dirs = new int[motorCount]{
+        1, //back_left_wheel dir
+        1,  
+        1,
+        1,
+        1,
+        1
+
+    };
 
     [SerializeField]
     private string[] wheelJointNames = new string[motorCount] {
@@ -32,9 +47,13 @@ public class MotorController : MonoBehaviour
         "right_front_wheel_link",
         "right_mid_wheel_link"
     };
-    // public List<string> childActuatorNames;    
-    // private List<ActuatorScript> actuators = new List<ActuatorScript>();
-// private Dictionary<string, ActuatorScript> actuators = new Dictionary<string, ActuatorScript>();
+        //  "back_left_wheel_link", //Original Layout
+        // "back_right_wheel_link",
+        // "left_front_wheel_link",
+        // "left_mid_wheel_link",
+        // "right_front_wheel_link",
+        // "right_mid_wheel_link"
+
     // Wheel joints
     [SerializeField]
     private ArticulationBody[] wheelJoints = new ArticulationBody[motorCount];
@@ -78,8 +97,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
         for (int i = 0; i < motorCount; i++)
         {
             string jointName = wheelJointNames[i];
-            // Use UnityEngine.Transform to avoid ambiguity
-            // UnityEngine.Transform jointTransform = transform.Find(jointName);
+            
             GameObject jointObject = GameObject.Find(jointName);
 
             if (jointObject != null)
@@ -110,16 +128,15 @@ private readonly object queueLock = new object(); // Lock for thread safety
         while (motorCommandQueue.Count > 0)
         {
             var msg = motorCommandQueue.Dequeue();
-            DriveMotors(msg);
+            DriveMotors(msg); //Cannot be called directly from callback, so needs callback to just trigger a queue
         }
     }
-        // If needed, you can call ros2Unity.SpinOnce() here
-        // ros2Unity.SpinOnce();
+    //Test code
         // std_msgs.msg.Float64MultiArray test_msg;
         // std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
         // test_msg.Data = new double[6] {1, 1, 1, 1, 1, 1};
         // MotorCommandCallback(test_msg);
-    // rosNode.SpinSome();
+        // rosNode.SpinSome();
     }
 
      private void DriveMotors(std_msgs.msg.Float64MultiArray msg){
@@ -164,19 +181,10 @@ lock (queueLock){
     // Callback for cmd_vel messages
     public void CmdVelCallback(geometry_msgs.msg.Twist msg)
     {
-        // Vector3 linear = new Vector3(
-        //     (float)msg.Linear.X,
-        //     (float)msg.Linear.Y,
-        //     (float)msg.Linear.Z
-        // );
-
-        // Vector3 angular = new Vector3(
-        //     (float)msg.Angular.X,
-        //     (float)msg.Angular.Y,
-        //     (float)msg.Angular.Z
-        // );
-        double linear = msg.Linear.X;
+ 
+        double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
         double angular = msg.Angular.Z;
+
         double right = linear + angular;
         double left = linear - angular;
    // std_msgs.msg.Float64MultiArray test_msg;
