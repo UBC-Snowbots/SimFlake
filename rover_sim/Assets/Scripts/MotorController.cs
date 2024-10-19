@@ -185,11 +185,14 @@ lock (queueLock){
         double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
         double angular = msg.Angular.Z;
 
-        double right = linear + angular;
+
+        //RIGHT is the inverse motor control of regular b/c motors dk what side they're on
+        // counterclockwise = positive velocity
+        double right = linear*-1 + angular;
         double left = linear - angular;
    // std_msgs.msg.Float64MultiArray test_msg;
         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
-        test_msg.Data = new double[6] {left, left, left, right, right, right};
+        test_msg.Data = new double[6] {left, right, left, left, right, right};
         MotorCommandCallback(test_msg);
         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
         // // TODO: Implement robot movement based on cmd_vel
