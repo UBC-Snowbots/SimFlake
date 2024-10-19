@@ -192,6 +192,9 @@ lock (queueLock){
         double left = linear - angular;
    // std_msgs.msg.Float64MultiArray test_msg;
         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
+
+        //this is correct distribution of motor commands following wheel_joint_names
+        //TODO: could change this to be more dynamic in the future
         test_msg.Data = new double[6] {left, right, left, left, right, right};
         MotorCommandCallback(test_msg);
         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
