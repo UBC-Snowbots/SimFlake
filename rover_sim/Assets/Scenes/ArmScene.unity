@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44658792, g: 0.49642283, b: 0.5748252, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657832, g: 0.49641222, b: 0.57481664, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -7555,6 +7555,7 @@ GameObject:
   - component: {fileID: 616237552}
   - component: {fileID: 616237551}
   - component: {fileID: 616237550}
+  - component: {fileID: 616237553}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -7636,6 +7637,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 13.59, y: 0, z: 0}
+--- !u!114 &616237553
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 616237549}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 191abbd27a5c78f129a6c2332b7545c3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  target: {fileID: 1978296903}
+  distance: 10
+  xSpeed: 120
+  ySpeed: 120
+  yMinLimit: -20
+  yMaxLimit: 80
+  zoomSpeed: 2
+  minDistance: 1
+  maxDistance: 20
 --- !u!4 &696763651 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5008299552807312212, guid: 2bdeced5b0febdd35a443bc50333d05d, type: 3}
