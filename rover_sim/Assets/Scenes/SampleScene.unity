@@ -2441,7 +2441,7 @@ GameObject:
   - component: {fileID: 743176735}
   - component: {fileID: 743176736}
   m_Layer: 0
-  m_Name: unnamed
+  m_Name: mainSquare
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -4872,7 +4872,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 903d92ef2547f0adbb48b2a1035ab4e9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  target: {fileID: 1027452873}
+  target: {fileID: 743176735}
   initialOffset: {x: 0, y: 0, z: 0}
 --- !u!4 &1696795872
 Transform:
@@ -4898,7 +4898,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1696795870}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab52fe1416be2bdf9bb8e62ace15fbcf, type: 3}
   m_Name: 
