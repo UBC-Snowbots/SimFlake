@@ -54,13 +54,16 @@ public class ArmController : MonoBehaviour
         // "right_front_wheel_link",
         // "right_mid_wheel_link"
 
+    [SerializeField]
+    float[] torque = new float[]{200, 300, 300, 400, 400, 400};
+
     // Wheel joints
     [SerializeField]
     private ArticulationBody[] armJoints = new ArticulationBody[NUM_AXES];
 
     // ROS2 Topic Names
     [SerializeField]
-    private string motorTopicName = "/arm/command";
+    private string motorTopicName = "/arm/sim_command";
     [SerializeField]
     private string cmdVelTopicName = "/cmd_vel";
 
@@ -102,10 +105,13 @@ private readonly object queueLock = new object(); // Lock for thread safety
 
             if (jointObject != null)
             {
-                armJoints[i] = jointObject.GetComponent<ArticulationBody>();
+                // armJoints[i] = jointObject.GetComponent<ArticulationBody>();
                 armJoints[i].gameObject.AddComponent<JointControl>();
                 armJoints[i].jointFriction = 1;
                 armJoints[i].angularDamping = 1;
+                ArticulationDrive drive = armJoints[i].xDrive;
+                drive.forceLimit = torque[i];
+                armJoints[i].xDrive = drive;
                 // JointControl currentDrive = wheelJoints.xDrive;
                 if (armJoints[i] == null)
                 {
@@ -161,7 +167,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
             }
             else
             {
-                Debug.LogError($"Wheel joint at index {i} is null");
+                Debug.LogError($"Arm joint at index {i} is null");
             }
         }
      }
@@ -188,14 +194,17 @@ lock (queueLock){
 
         //RIGHT is the inverse motor control of regular b/c motors dk what side they're on
         // counterclockwise = positive velocity
-        double right = linear*-1 + angular;
-        double left = linear - angular;
+        // double right = linear*-1 + angular;
+        // double left = linear - angular;
+        double right = angular;
+        double left = angular;
    // std_msgs.msg.Float64MultiArray test_msg;
         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
 
         //this is correct distribution of motor commands following wheel_joint_names
         //TODO: could change this to be more dynamic in the future
         test_msg.Data = new double[6] {left, right, left, left, right, right};
+        
         MotorCommandCallback(test_msg);
         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
         // // TODO: Implement robot movement based on cmd_vel

@@ -69,7 +69,6 @@ private readonly object queueLock = new object(); // Lock for thread safety
 
     void Start()
     {
-                        print("MeowStart");
 
         // Initialize ROS2
         if (ros2Unity.Ok())
