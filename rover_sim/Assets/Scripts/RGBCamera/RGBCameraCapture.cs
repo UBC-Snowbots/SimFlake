@@ -57,7 +57,6 @@ public class RGBCameraCapture : MonoBehaviour
 
 
 
-        //currently will publish image at non-standard refresh rate
     }
 
 
@@ -125,7 +124,8 @@ public class RGBCameraCapture : MonoBehaviour
         RenderTexture.active = null;
 
         // Convert the Texture2D to a byte array
-        byte[] imageBytes = texture2D.EncodeToJPG(50);
+        //using JPEG encoding at 50% --how much data being lost?
+        byte[] imageBytes = texture2D.GetRawTextureData();
         //return byte array
         PublishImage(imageBytes);
         

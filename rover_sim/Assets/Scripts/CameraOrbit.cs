@@ -11,7 +11,7 @@ public class CameraOrbit : MonoBehaviour
     public float yMinLimit = -20f; // Minimum y-axis angle
     public float yMaxLimit = 80f; // Maximum y-axis angle
     public float zoomSpeed = 2.0f; // Speed of zooming
-    public float minDistance = 2.0f; // Minimum zoom distance
+    public float minDistance = 0.0f; // Minimum zoom distance
     public float maxDistance = 20.0f; // Maximum zoom distance
 
     private float x = 0.0f;
