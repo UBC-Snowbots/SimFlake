@@ -225,7 +225,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -960,7 +960,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9157924271501443928, guid: 755ee32b773522244b5669c29d5ebd96, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.3
+      value: 6.39
       objectReference: {fileID: 0}
     - target: {fileID: 9157924271501443928, guid: 755ee32b773522244b5669c29d5ebd96, type: 3}
       propertyPath: m_LocalPosition.z
@@ -5612,7 +5612,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -6979,7 +6979,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -14209,7 +14209,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -15027,7 +15027,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -16761,7 +16761,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -20258,7 +20258,7 @@ Transform:
   m_GameObject: {fileID: 1922735414}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.093, y: 0.916, z: -0.577}
+  m_LocalPosition: {x: 0.093, y: 0.932, z: -0.577}
   m_LocalScale: {x: 1.55, y: 0.1, z: 0.83}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -20413,6 +20413,7 @@ GameObject:
   - component: {fileID: 1978296903}
   - component: {fileID: 1978296902}
   - component: {fileID: 1978296904}
+  - component: {fileID: 1978296905}
   m_Layer: 0
   m_Name: dev_arm
   m_TagString: robot
@@ -20460,7 +20461,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1978296900}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d607ea46a579d44c4b19a6322ce4b9b2, type: 3}
   m_Name: 
@@ -20475,6 +20476,35 @@ MonoBehaviour:
   torque: 100
   acceleration: 5
   highLightColor: {r: 1, g: 0, b: 0, a: 1}
+--- !u!114 &1978296905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1978296900}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b961c2ca08a39019990e1db819b16938, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  motor_dirs: 010000000100000001000000010000000100000001000000
+  armLinkNames:
+  - link_1
+  - link_2
+  - link_3
+  - link_4
+  - link_5
+  - link_6
+  armJoints:
+  - {fileID: 586667244}
+  - {fileID: 1428169302}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  motorTopicName: /arm/command
+  cmdVelTopicName: /cmd_vel
 --- !u!4 &1981517795 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5008299552807312212, guid: 2bdeced5b0febdd35a443bc50333d05d, type: 3}

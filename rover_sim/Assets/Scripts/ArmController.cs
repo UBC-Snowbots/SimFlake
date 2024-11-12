@@ -4,6 +4,7 @@ using UnityEngine;
 using ROS2;
 using System;
 // using GameObject;
+
 //TODO Figure out
     //? Unity uses degrees or rads?
     //? 
@@ -13,21 +14,21 @@ using System;
 // using geometry_msgs = geometry_msgs.msg;
 
 
-public class MotorController : MonoBehaviour
+public class ArmController : MonoBehaviour
 {
     // ROS2 Node and Subscribers
     // private ROS2UnityComponent ros2Unity
     private ROS2Node rosNode;
-    private ISubscription<std_msgs.msg.Float64MultiArray> motorSub;
+    private ISubscription<std_msgs.msg.Float64MultiArray> armSub;
     private ISubscription<geometry_msgs.msg.Twist> cmdVelSub;
 
     // Motor command array size
-    private const int motorCount = 6;
+    private const int NUM_AXES = 6;
         ROS2UnityCore ros2Unity = new ROS2UnityCore();
 
     // Wheel joint names in the same order as motor commands
     [SerializeField]
-    private int[] motor_dirs = new int[motorCount]{
+    private int[] motor_dirs = new int[NUM_AXES]{
         1, //back_left_wheel dir
         1,  
         1,
@@ -38,13 +39,13 @@ public class MotorController : MonoBehaviour
     };
 
     [SerializeField]
-    private string[] wheelJointNames = new string[motorCount] {
-        "back_left_wheel_link",
-        "back_right_wheel_link",
-        "left_front_wheel_link",
-        "left_mid_wheel_link",
-        "right_front_wheel_link",
-        "right_mid_wheel_link"
+    private string[] armLinkNames = new string[NUM_AXES] {
+        "link_1",
+        "link_2",
+        "link_3",
+        "link_4",
+        "link_5",
+        "link_6"
     };
         //  "back_left_wheel_link", //Original Layout
         // "back_right_wheel_link",
@@ -55,11 +56,11 @@ public class MotorController : MonoBehaviour
 
     // Wheel joints
     [SerializeField]
-    private ArticulationBody[] wheelJoints = new ArticulationBody[motorCount];
+    private ArticulationBody[] armJoints = new ArticulationBody[NUM_AXES];
 
     // ROS2 Topic Names
     [SerializeField]
-    private string motorTopicName = "/motor_commands";
+    private string motorTopicName = "/arm/command";
     [SerializeField]
     private string cmdVelTopicName = "/cmd_vel";
 
@@ -69,14 +70,14 @@ private readonly object queueLock = new object(); // Lock for thread safety
 
     void Start()
     {
-                        print("MeowStart");
+                        print("Arm Start");
 
         // Initialize ROS2
         if (ros2Unity.Ok())
         {
-            rosNode = ros2Unity.CreateNode("unity_motor_controller");
+            rosNode = ros2Unity.CreateNode("unity_arm_controller");
             // Subscribe to motor commands topic
-            motorSub = rosNode.CreateSubscription<std_msgs.msg.Float64MultiArray>(
+            armSub = rosNode.CreateSubscription<std_msgs.msg.Float64MultiArray>(
                 motorTopicName,
                 msg => MotorCommandCallback(msg)
                 );
@@ -93,20 +94,20 @@ private readonly object queueLock = new object(); // Lock for thread safety
         }
 
         // Find and store the wheel joints
-        for (int i = 0; i < motorCount; i++)
+        for (int i = 0; i < NUM_AXES; i++)
         {
-            string jointName = wheelJointNames[i];
+            string jointName = armLinkNames[i];
             
             GameObject jointObject = GameObject.Find(jointName);
 
             if (jointObject != null)
             {
-                wheelJoints[i] = jointObject.GetComponent<ArticulationBody>();
-                wheelJoints[i].gameObject.AddComponent<JointControl>();
-                wheelJoints[i].jointFriction = 1;
-                wheelJoints[i].angularDamping = 1;
+                armJoints[i] = jointObject.GetComponent<ArticulationBody>();
+                armJoints[i].gameObject.AddComponent<JointControl>();
+                armJoints[i].jointFriction = 1;
+                armJoints[i].angularDamping = 1;
                 // JointControl currentDrive = wheelJoints.xDrive;
-                if (wheelJoints[i] == null)
+                if (armJoints[i] == null)
                 {
                     Debug.LogError($"ArticulationBody not found on joint {jointName}");
                 }
@@ -139,17 +140,17 @@ private readonly object queueLock = new object(); // Lock for thread safety
     }
 
      private void DriveMotors(std_msgs.msg.Float64MultiArray msg){
-        double[] motorCommands = msg.Data;
-       if (motorCommands.Length != motorCount)
+        double[] armCommands = msg.Data;
+       if (armCommands.Length != NUM_AXES)
         {
-            Debug.LogWarning($"Expected {motorCount} motor commands, but received {motorCommands.Length}.");
+            Debug.LogWarning($"Expected {NUM_AXES} motor commands, but received {armCommands.Length}.");
             return;
         }
 
-        for (int i = 0; i < motorCount; i++)
+        for (int i = 0; i < NUM_AXES; i++)
         {
-            double command = motorCommands[i];
-            var joint = wheelJoints[i];
+            double command = armCommands[i];
+            var joint = armJoints[i];
             if (joint != null)
             {
                 // Set the target velocity of the joint
