@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.44657832, g: 0.49641222, b: 0.57481664, a: 1}
+  m_IndirectSpecularColor: {r: 0.44658792, g: 0.49642283, b: 0.5748252, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -7631,7 +7631,7 @@ Transform:
   m_GameObject: {fileID: 616237549}
   serializedVersion: 2
   m_LocalRotation: {x: 0.11831733, y: 0, z: 0, w: 0.99297583}
-  m_LocalPosition: {x: 3.24, y: 1.67, z: -2.62}
+  m_LocalPosition: {x: 3.24, y: 1.36, z: -1.36}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -20518,15 +20518,23 @@ MonoBehaviour:
   - link_4
   - link_5
   - link_6
+  torque:
+  - 200
+  - 300
+  - 300
+  - 400
+  - 400
+  - 400
   armJoints:
   - {fileID: 586667244}
   - {fileID: 1428169302}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  motorTopicName: /arm/command
-  cmdVelTopicName: /cmd_vel
+  - {fileID: 488302435}
+  - {fileID: 1507512486}
+  - {fileID: 41876679}
+  - {fileID: 1201822266}
+  motorTopicName: /arm/sim_command
+  jointStatesTopicName: /joint_states
+  armPositionFeedbackTopicName: /arm/sim_feedback
 --- !u!4 &1981517795 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5008299552807312212, guid: 2bdeced5b0febdd35a443bc50333d05d, type: 3}
