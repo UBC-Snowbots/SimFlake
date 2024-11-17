@@ -7650,7 +7650,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   target: {fileID: 1978296903}
-  distance: 10
+  distance: 2.79
   xSpeed: 120
   ySpeed: 120
   yMinLimit: -20
