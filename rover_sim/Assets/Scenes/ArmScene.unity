@@ -951,6 +951,10 @@ PrefabInstance:
       value: Table 1 (2)
       objectReference: {fileID: 0}
     - target: {fileID: 8691317156095212740, guid: 755ee32b773522244b5669c29d5ebd96, type: 3}
+      propertyPath: volume
+      value: 0.464
+      objectReference: {fileID: 0}
+    - target: {fileID: 8691317156095212740, guid: 755ee32b773522244b5669c29d5ebd96, type: 3}
       propertyPath: forceRequired
       value: 6.87
       objectReference: {fileID: 0}

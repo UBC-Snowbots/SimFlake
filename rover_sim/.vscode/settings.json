@@ -51,5 +51,6 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "rover_sim.sln"
+    "dotnet.defaultSolution": "rover_sim.sln",
+    "ros.distro": "humble"
 }

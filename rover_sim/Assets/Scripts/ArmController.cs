@@ -35,11 +35,11 @@ public class ArmController : MonoBehaviour
     // Wheel joint names in the same order as motor commands
     [SerializeField]
     private int[] motor_dirs = new int[NUM_AXES]{
-        1, //back_left_wheel dir
-        1,  
+        1, //axis 1
+        -1,  
         1,
         1,
-        1,
+        -1,
         1
 
     };
@@ -162,9 +162,9 @@ private readonly object queueLock = new object(); // Lock for thread safety
 
     for(int i = 0; i < NUM_AXES; i++){
     ArticulationReducedSpace joint_position = armJoints[i].jointPosition;
-    ArticulationReducedSpace joint_velocity = armJoints[i].jointVelocity;;
-    current_positions[i] = joint_position[0];
-    current_velocities[i] = joint_velocity[0];
+    ArticulationReducedSpace joint_velocity = armJoints[i].jointVelocity;
+    current_positions[i] = joint_position[0] * motor_dirs[i];
+    current_velocities[i] = joint_velocity[0] * motor_dirs[i];
 
     }
     // time_elapsed += Time.deltaTime; //* can add a timer, but would be trying to update positions at FPS rate
@@ -178,8 +178,8 @@ DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 // DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 DateTime currentTime = DateTime.UtcNow;
 double timeSinceEpoch = (currentTime - unixEpoch).TotalSeconds;
-int sec = (int)currentTime.Second;
-uint nanosec = (uint)(((currentTime.Second - (int)currentTime.Second) * 1e9));
+int sec = (int)currentTime.Second + (int)timeSinceEpoch;
+uint nanosec = (uint)currentTime.Ticks;//(uint)(((currentTime.Second - (uint)currentTime.Second) * 1e9));
     sensor_msgs.msg.JointState joint_state_msg = new sensor_msgs.msg.JointState();
     joint_state_msg.Header.Stamp.Sec = sec;
     joint_state_msg.Header.Stamp.Nanosec = nanosec;
@@ -217,7 +217,7 @@ uint nanosec = (uint)(((currentTime.Second - (int)currentTime.Second) * 1e9));
             {
                 // Set the target velocity of the joint
                 var drive = joint.xDrive;
-                drive.targetVelocity = (float)command;
+                drive.targetVelocity = (float)command * motor_dirs[i];
                 joint.xDrive = drive;
                 print("Meow");
             }
