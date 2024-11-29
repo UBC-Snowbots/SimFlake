@@ -101,7 +101,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
             if (jointObject != null)
             {
                 wheelJoints[i] = jointObject.GetComponent<ArticulationBody>();
-                wheelJoints[i].gameObject.AddComponent<JointControl>();
+                // wheelJoints[i].gameObject.AddComponent<JointControl>();
                 wheelJoints[i].jointFriction = 1;
                 wheelJoints[i].angularDamping = 1;
                 // JointControl currentDrive = wheelJoints.xDrive;

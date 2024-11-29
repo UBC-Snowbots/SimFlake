@@ -128,7 +128,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
             if (jointObject != null)
             {
                 // armJoints[i] = jointObject.GetComponent<ArticulationBody>(); //! Articulation body is set manually in unity, after script has been placed on arm
-                armJoints[i].gameObject.AddComponent<JointControl>();
+                // armJoints[i].gameObject.AddComponent<JointControl>();
                 armJoints[i].jointFriction = 1;
                 armJoints[i].angularDamping = 1;
                 ArticulationDrive drive = armJoints[i].xDrive;
