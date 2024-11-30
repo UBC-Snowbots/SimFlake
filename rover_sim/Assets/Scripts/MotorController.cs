@@ -4,6 +4,7 @@ using UnityEngine;
 using ROS2;
 using System;
 // using GameObject;
+
 //TODO Figure out
     //? Unity uses degrees or rads?
     //? 
@@ -69,6 +70,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
 
     void Start()
     {
+                        print("MeowStart");
 
         // Initialize ROS2
         if (ros2Unity.Ok())
@@ -101,7 +103,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
             if (jointObject != null)
             {
                 wheelJoints[i] = jointObject.GetComponent<ArticulationBody>();
-                // wheelJoints[i].gameObject.AddComponent<JointControl>();
+         //       wheelJoints[i].gameObject.AddComponent<JointControl>();
                 wheelJoints[i].jointFriction = 1;
                 wheelJoints[i].angularDamping = 1;
                 // JointControl currentDrive = wheelJoints.xDrive;

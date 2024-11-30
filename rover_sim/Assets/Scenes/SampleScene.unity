@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.44658792, g: 0.49642283, b: 0.5748252, a: 1}
+  m_IndirectSpecularColor: {r: 0.44657832, g: 0.49641222, b: 0.57481664, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -3142,23 +3142,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d607ea46a579d44c4b19a6322ce4b9b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  articulationChain: []
-  prevColor: []
-  previousIndex: 0
-  selectedJoint: 
-  selectedIndex: 0
-  control: 0
-  stiffness: 0
-  damping: 0
-  forceLimit: 0
-  speed: 100
-  torque: 100
-  acceleration: 100
-  highLightColor:
-    r: 1
-    g: 0
-    b: 0
-    a: 1
 --- !u!114 &946055890
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4936,14 +4919,14 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1696795870}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab52fe1416be2bdf9bb8e62ace15fbcf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   rgbCamera: {fileID: 1917711737}
-  width: 1920
-  height: 1080
+  width: 640
+  height: 360
   fps: 30
 --- !u!1 &1707954019
 GameObject:

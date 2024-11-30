@@ -11,8 +11,8 @@ using std_msgs.msg;
 public class RGBCameraCapture : MonoBehaviour
 {
     public Camera rgbCamera; // The RGB camera
-    public int width = 1920; // Width of the captured image
-    public int height = 1080; // Height of the captured image
+    public int width = 1920; // Width of the image
+    public int height = 1080; // Height of the image
     public int fps = 30; // Frames per second
 
     private RenderTexture renderTexture;
@@ -77,25 +77,42 @@ public class RGBCameraCapture : MonoBehaviour
         }
     }
 
+   //encodes rendered view into byte[] to send thru ROS network
+    void CaptureImage()
+    {
+        // Render the camera's view to the RenderTexture
+        rgbCamera.Render();
 
+        // Read the RenderTexture into the Texture2D
+        RenderTexture.active = renderTexture;
+        texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+        texture2D.Apply();
+        RenderTexture.active = null;
+
+        // Convert the Texture2D to a byte array
+        //texture2D.Compress(false);
+        byte[] imageBytes = texture2D.GetRawTextureData();
+
+
+        
+        
+        //return byte array
+        PublishImage(imageBytes);
+        
+    }
 
 
 
     //publishing single image to ROS..
      private void PublishImage(byte[] imageBytes)
     {
-        // Wait for a short period to ensure everything is initialized
-
-        // Convert Unity Texture2D to byte array (for example, RGB8 format)
-        
-
 
         // Create the ROS 2 Image message
         var imageMessage = new Image
         {
             Header  = new std_msgs.msg.Header(){Frame_id = "camera_frame"},
             Height = (uint)height,      //requires unsigned... doesn't matter for our usecase, can explicit cast
-            Width = (uint)width,
+            Width = (uint)width,        //ditto 
             Encoding = "rgb8",            // Image encoding 
             Step = (uint)width * 3,             // 3 bytes per pixel for RGB encoding
             Data = imageBytes             // The image data as byte array
@@ -111,23 +128,5 @@ public class RGBCameraCapture : MonoBehaviour
     
 
 
-    //encodes rendered view into byte[] to send thru ROS network
-    void CaptureImage()
-    {
-        // Render the camera's view to the RenderTexture
-        rgbCamera.Render();
-
-        // Read the RenderTexture into the Texture2D
-        RenderTexture.active = renderTexture;
-        texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        texture2D.Apply();
-        RenderTexture.active = null;
-
-        // Convert the Texture2D to a byte array
-        //using JPEG encoding at 50% --how much data being lost?
-        byte[] imageBytes = texture2D.GetRawTextureData();
-        //return byte array
-        PublishImage(imageBytes);
-        
-    }
+ 
 }
