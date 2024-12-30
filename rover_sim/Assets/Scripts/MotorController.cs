@@ -157,7 +157,6 @@ private readonly object queueLock = new object(); // Lock for thread safety
                 var drive = joint.xDrive;
                 drive.targetVelocity = (float)command;
                 joint.xDrive = drive;
-                print("Meow");
             }
             else
             {
@@ -171,7 +170,6 @@ private readonly object queueLock = new object(); // Lock for thread safety
     {
           
 lock (queueLock){
-  print("MeowCallbackLocked");
           motorCommandQueue.Enqueue(msg);
 }
 
@@ -196,8 +194,9 @@ lock (queueLock){
         //this is correct distribution of motor commands following wheel_joint_names
         //TODO: could change this to be more dynamic in the future
         test_msg.Data = new double[6] {left, right, left, left, right, right};
-        MotorCommandCallback(test_msg);
         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
+
+        MotorCommandCallback(test_msg);
         // // TODO: Implement robot movement based on cmd_vel
         // // For example, convert linear and angular velocities to wheel velocities
         // and set the wheel joints' target velocities accordingly

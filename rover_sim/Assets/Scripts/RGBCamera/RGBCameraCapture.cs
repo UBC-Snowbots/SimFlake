@@ -121,7 +121,7 @@ public class RGBCameraCapture : MonoBehaviour
         // Publish the image message to ROS 2
         imagePublisher.Publish(imageMessage);
 
-        Debug.Log("Image message published to ROS 2 topic!");
+      //  Debug.Log("Image message published to ROS 2 topic!");
     }
 
 
