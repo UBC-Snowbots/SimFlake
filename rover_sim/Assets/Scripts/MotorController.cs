@@ -64,7 +64,7 @@ public class MotorController : MonoBehaviour
     private string cmdVelTopicName = "/cmd_vel";
 
     [SerializeField]
-    private double wheel_radius_meters = 0.3;
+    private double wheel_radius_meters = 0.3; //* Not exact, just arbritrary placeholder for now.
 
 private Queue<std_msgs.msg.Float64MultiArray> motorCommandQueue = new Queue<std_msgs.msg.Float64MultiArray>();
 private readonly object queueLock = new object(); // Lock for thread safety
@@ -183,7 +183,7 @@ lock (queueLock){
  
         double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
         double angular = msg.Angular.Z;
-        double wheel_degPerSec_coeff =  360/wheel_radius_meters * 3.14/2 * 0.01; //? Not sure if this math is right.
+        double wheel_degPerSec_coeff =  360/wheel_radius_meters * 3.14/2 * 0.01; //? Math is not right
         linear = linear * wheel_degPerSec_coeff;
         angular = angular * wheel_degPerSec_coeff;
         //RIGHT is the inverse motor control of regular b/c motors dk what side they're on

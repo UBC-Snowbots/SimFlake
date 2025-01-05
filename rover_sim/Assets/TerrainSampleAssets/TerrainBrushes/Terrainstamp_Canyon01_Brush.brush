@@ -40,4 +40,4 @@ MonoBehaviour:
   m_RadiusScale: 1.4849247
   m_BlackWhiteRemapMin: 0
   m_BlackWhiteRemapMax: 1
-  m_InvertRemapRange: 0
+  m_InvertRemapRange: 1
