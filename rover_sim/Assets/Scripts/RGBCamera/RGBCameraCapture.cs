@@ -68,13 +68,29 @@ public class RGBCameraCapture : MonoBehaviour
     // 
     IEnumerator CaptureAndPublishImages()
     {
-        while (true)
-        {
-            yield return new WaitForSeconds(1.0f / fps);
+        float interval = 1.0f / fps;
+        float nextExecutionTime = Time.time;
 
-            // Capture the image
-            CaptureImage();
+    while (true)
+    {
+        // Ensure the next execution happens at the fixed interval
+        nextExecutionTime += interval;
+
+        // Capture the image
+        CaptureImage();
+
+        // Calculate the time to wait until the next execution
+        float sleepTime = nextExecutionTime - Time.time;
+        if (sleepTime > 0)
+        {
+            yield return new WaitForSeconds(sleepTime);
         }
+        else
+        {
+            // If we're behind schedule, skip waiting to catch up
+            Debug.LogWarning("Frame skipped to maintain timing!");
+        }
+    }
     }
 
    //encodes rendered view into byte[] to send thru ROS network
