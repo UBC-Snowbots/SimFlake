@@ -7,7 +7,7 @@ public class CameraOrbit : MonoBehaviour
     public Transform target; // The target object to orbit around
     public float distance = 10.0f; // Distance from the target
     public float xSpeed = 120.0f; // Speed of rotation around the x-axis
-    public float ySpeed = 120.0f; // Speed of rotation around the y-axis
+    public float ySpeed = 120.0f; // Speed of rotation around the y-axis1
     public float yMinLimit = -20f; // Minimum y-axis angle
     public float yMaxLimit = 80f; // Maximum y-axis angle
     public float zoomSpeed = 2.0f; // Speed of zooming

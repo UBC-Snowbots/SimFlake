@@ -11,8 +11,8 @@ using std_msgs.msg;
 public class RGBCameraCapture : MonoBehaviour
 {
     public Camera rgbCamera; // The RGB camera
-    public int width = 1920; // Width of the captured image
-    public int height = 1080; // Height of the captured image
+    public int width = 1920; // Width of the image
+    public int height = 1080; // Height of the image
     public int fps = 30; // Frames per second
 
     private RenderTexture renderTexture;
@@ -68,50 +68,32 @@ public class RGBCameraCapture : MonoBehaviour
     // 
     IEnumerator CaptureAndPublishImages()
     {
-        while (true)
-        {
-            yield return new WaitForSeconds(1.0f / fps);
+        float interval = 1.0f / fps;
+        float nextExecutionTime = Time.time;
 
-            // Capture the image
-            CaptureImage();
+    while (true)
+    {
+        // Ensure the next execution happens at the fixed interval
+        nextExecutionTime += interval;
+
+        // Capture the image
+        CaptureImage();
+
+        // Calculate the time to wait until the next execution
+        float sleepTime = nextExecutionTime - Time.time;
+        if (sleepTime > 0)
+        {
+            yield return new WaitForSeconds(sleepTime);
+        }
+        else
+        {
+            // If we're behind schedule, skip waiting to catch up
+            Debug.LogWarning("Frame skipped to maintain timing!");
         }
     }
-
-
-
-
-
-    //publishing single image to ROS..
-     private void PublishImage(byte[] imageBytes)
-    {
-        // Wait for a short period to ensure everything is initialized
-
-        // Convert Unity Texture2D to byte array (for example, RGB8 format)
-        
-
-
-        // Create the ROS 2 Image message
-        var imageMessage = new Image
-        {
-            Header  = new std_msgs.msg.Header(){Frame_id = "camera_frame"},
-            Height = (uint)height,      //requires unsigned... doesn't matter for our usecase, can explicit cast
-            Width = (uint)width,
-            Encoding = "rgb8",            // Image encoding 
-            Step = (uint)width * 3,             // 3 bytes per pixel for RGB encoding
-            Data = imageBytes             // The image data as byte array
-        };
-
-        // Publish the image message to ROS 2
-        imagePublisher.Publish(imageMessage);
-
-        Debug.Log("Image message published to ROS 2 topic!");
     }
 
-
-    
-
-
-    //encodes rendered view into byte[] to send thru ROS network
+   //encodes rendered view into byte[] to send thru ROS network
     void CaptureImage()
     {
         // Render the camera's view to the RenderTexture
@@ -124,10 +106,43 @@ public class RGBCameraCapture : MonoBehaviour
         RenderTexture.active = null;
 
         // Convert the Texture2D to a byte array
-        //using JPEG encoding at 50% --how much data being lost?
+        //texture2D.Compress(false);
         byte[] imageBytes = texture2D.GetRawTextureData();
+
+
+        
+        
         //return byte array
         PublishImage(imageBytes);
         
     }
+
+
+
+    //publishing single image to ROS..
+     private void PublishImage(byte[] imageBytes)
+    {
+
+        // Create the ROS 2 Image message
+        var imageMessage = new Image
+        {
+            Header  = new std_msgs.msg.Header(){Frame_id = "camera_frame"},
+            Height = (uint)height,      //requires unsigned... doesn't matter for our usecase, can explicit cast
+            Width = (uint)width,        //ditto 
+            Encoding = "rgb8",            // Image encoding 
+            Step = (uint)width * 3,             // 3 bytes per pixel for RGB encoding
+            Data = imageBytes             // The image data as byte array
+        };
+
+        // Publish the image message to ROS 2
+        imagePublisher.Publish(imageMessage);
+
+      //  Debug.Log("Image message published to ROS 2 topic!");
+    }
+
+
+    
+
+
+ 
 }

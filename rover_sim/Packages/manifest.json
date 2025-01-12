@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.siemens.ros-sharp": "https://github.com/siemens/ros-sharp.git?path=/com.siemens.ros-sharp",
     "com.unity.collab-proxy": "2.5.2",
     "com.unity.device-simulator.devices": "1.0.0",
     "com.unity.feature.development": "1.0.1",
@@ -8,7 +9,6 @@
     "com.unity.ide.vscode": "1.2.5",
     "com.unity.render-pipelines.high-definition": "14.0.9",
     "com.unity.render-pipelines.universal": "14.0.9",
-    "com.unity.robotics.urdf-importer": "https://github.com/Unity-Technologies/URDF-Importer.git?path=/com.unity.robotics.urdf-importer#v0.5.2",
     "com.unity.shadergraph": "14.0.9",
     "com.unity.test-framework": "1.1.33",
     "com.unity.textmeshpro": "3.0.6",

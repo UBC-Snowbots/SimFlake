@@ -4,6 +4,7 @@ using UnityEngine;
 using ROS2;
 using System;
 // using GameObject;
+
 //TODO Figure out
     //? Unity uses degrees or rads?
     //? 
@@ -11,7 +12,6 @@ using System;
 // Import ROS2 message types with aliases to avoid conflicts
 // using std_msgs = std_msgs.msg;
 // using geometry_msgs = geometry_msgs.msg;
-
 
 public class MotorController : MonoBehaviour
 {
@@ -63,12 +63,15 @@ public class MotorController : MonoBehaviour
     [SerializeField]
     private string cmdVelTopicName = "/cmd_vel";
 
+    [SerializeField]
+    private double wheel_radius_meters = 0.3; //* Not exact, just arbritrary placeholder for now.
 
 private Queue<std_msgs.msg.Float64MultiArray> motorCommandQueue = new Queue<std_msgs.msg.Float64MultiArray>();
 private readonly object queueLock = new object(); // Lock for thread safety
 
     void Start()
     {
+                        print("MeowStart");
 
         // Initialize ROS2
         if (ros2Unity.Ok())
@@ -101,7 +104,7 @@ private readonly object queueLock = new object(); // Lock for thread safety
             if (jointObject != null)
             {
                 wheelJoints[i] = jointObject.GetComponent<ArticulationBody>();
-                wheelJoints[i].gameObject.AddComponent<JointControl>();
+         //       wheelJoints[i].gameObject.AddComponent<JointControl>();
                 wheelJoints[i].jointFriction = 1;
                 wheelJoints[i].angularDamping = 1;
                 // JointControl currentDrive = wheelJoints.xDrive;
@@ -155,7 +158,6 @@ private readonly object queueLock = new object(); // Lock for thread safety
                 var drive = joint.xDrive;
                 drive.targetVelocity = (float)command;
                 joint.xDrive = drive;
-                print("Meow");
             }
             else
             {
@@ -169,7 +171,6 @@ private readonly object queueLock = new object(); // Lock for thread safety
     {
           
 lock (queueLock){
-  print("MeowCallbackLocked");
           motorCommandQueue.Enqueue(msg);
 }
 
@@ -182,20 +183,22 @@ lock (queueLock){
  
         double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
         double angular = msg.Angular.Z;
-
-
+        double wheel_degPerSec_coeff =  360/wheel_radius_meters * 3.14/2 * 0.01; //? Math is not right
+        linear = linear * wheel_degPerSec_coeff;
+        angular = angular * wheel_degPerSec_coeff;
         //RIGHT is the inverse motor control of regular b/c motors dk what side they're on
         // counterclockwise = positive velocity
         double right = linear*-1 + angular;
-        double left = linear - angular;
+        double left = linear + angular;
    // std_msgs.msg.Float64MultiArray test_msg;
         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
 
         //this is correct distribution of motor commands following wheel_joint_names
         //TODO: could change this to be more dynamic in the future
         test_msg.Data = new double[6] {left, right, left, left, right, right};
-        MotorCommandCallback(test_msg);
         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
+
+        MotorCommandCallback(test_msg);
         // // TODO: Implement robot movement based on cmd_vel
         // // For example, convert linear and angular velocities to wheel velocities
         // and set the wheel joints' target velocities accordingly
