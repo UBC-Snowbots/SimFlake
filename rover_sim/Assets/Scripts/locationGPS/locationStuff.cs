@@ -4,6 +4,10 @@ using UnityEngine;
 using TMPro;
 using System;
 
+//ROS2 stuff
+using ROS2;
+using sensor_msgs.msg;
+
 public class LocationStuff : MonoBehaviour
 {
     [SerializeField]
@@ -21,7 +25,14 @@ public class LocationStuff : MonoBehaviour
     Vector3 startPosition;  // Store the rover's initial position in world space
     public Transform object_to_track;
 
-
+    [Header("ROS2 Publishing")]
+    [Tooltip("Publish rate in Hz")]
+    [SerializeField] private float publishRateHz = 5f;
+    ROS2UnityCore ros2Unity = new ROS2UnityCore();
+    private float publishTimer = 0f;
+    private ROS2Node rosNode;
+    private IPublisher<NavSatFix> gpsPublisher;
+    private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     // Start is called before the first frame update
     IEnumerator Start()
     {
@@ -33,7 +44,16 @@ public class LocationStuff : MonoBehaviour
         yield return new WaitForSeconds(2);  // Simulate a brief delay for GPS startup
         gps_ok = true;
         debugTxt.text = "GPS initialized. Starting at (0, 0).";
-
+       // Initialize ROS2
+        if (ros2Unity.Ok())
+        {
+            rosNode = ros2Unity.CreateNode("gps_sensor_node");
+            gpsPublisher = rosNode.CreatePublisher<NavSatFix>("/gps/fix");
+        }
+        else
+        {
+            Debug.LogError("ROS2UnityCore is not OK");
+        }
     }
 
     // Update is called once per frame
@@ -53,9 +73,46 @@ public class LocationStuff : MonoBehaviour
                 double distanceBetween = distance(currLoc.lat, currLoc.lon, startLoc.lat, startLoc.lon, 'K');
                 debugTxt.text += "\nDistance from start: " + distanceBetween.ToString("F2") + " km";
             }
+                publishTimer += Time.deltaTime;
+            if (publishTimer >= (1f / publishRateHz))
+            {
+                publishTimer = 0f;
+                PublishGPS();
+            }
         }
+  
     }
+    private void PublishGPS()
+    {
+        if (gpsPublisher == null)
+            return;
 
+        // Create a new NavSatFix message
+        NavSatFix msg = new NavSatFix();
+
+        // 1. Fill the header with a ROS timestamp
+        double secs = (DateTime.UtcNow - epoch).TotalSeconds;
+        uint secsInt = (uint)secs;
+        uint nsecs = (uint)((secs - secsInt) * 1e9);
+
+        msg.Header = new std_msgs.msg.Header
+            {
+                Frame_id = "camera_frame",
+                Stamp = new builtin_interfaces.msg.Time
+                {
+                    Sec = (int)(Time.timeSinceLevelLoad),
+                    Nanosec = (uint)((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
+                }
+            };
+
+        // 2. Fill latitude/longitude (and altitude if available)
+        msg.Latitude = currLoc.lat;   // NavSatFix expects double
+        msg.Longitude = currLoc.lon;  // so cast if needed
+        msg.Altitude = 100.0;
+
+        // 3. Publish
+        gpsPublisher.Publish(msg);
+    }
     public void StopGPS()
     {
         gps_ok = false;
