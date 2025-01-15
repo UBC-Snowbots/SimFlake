@@ -56,38 +56,19 @@ public class HorizontalLidarScanner : MonoBehaviour
             {
                 float angle = i * ((360f) / numberOfRays);
                 Vector3 direction = Quaternion.Euler(0, angle, 0) * transform.forward;
-                // RaycastHit hit;
                 if (Physics.Raycast(transform.position, direction, out var hit, scanRadius))
                     {
-                    Debug.Log($"Hit detected at {hit.point}");
                     ranges.Add(hit.distance);
-                    Debug.Log(hit.distance);
 
-                    GameObject hitMarker = Instantiate(hitMarkerPrefab, hit.point, Quaternion.identity); // Instantiate the square
-                    Destroy(hitMarker, hitMarkerLifetime); // Destroy the hit marker after a certain duration
+
+                // USED TO VISUALIZE THE RAYCASTS IN THE SCENE
+                 //   GameObject hitMarker = Instantiate(hitMarkerPrefab, hit.point, Quaternion.identity); // Instantiate the square
+                //    Destroy(hitMarker, hitMarkerLifetime); // Destroy the hit marker after a certain duration
                 } else {
                 ranges.Add(float.MaxValue);
                 }
 
             }
-
-
-            // var yawSensorDegrees = Mathf.Lerp(m_CurrentScanAngleStart, m_CurrentScanAngleEnd, t);
-            // var yawDegrees = yawBaseDegrees + yawSensorDegrees;
-            // var directionVector = Quaternion.Euler(0f, yawDegrees, 0f) * Vector3.forward;
-            // var measurementStart = RangeMetersMin * directionVector + transform.position;
-            // var measurementRay = new Ray(measurementStart, directionVector);
-            // var foundValidMeasurement = Physics.Raycast(measurementRay, out var hit, RangeMetersMax);
-            // // Only record measurement if it's within the sensor's operating range
-            // if (foundValidMeasurement)
-            // {
-            //     ranges.Add(hit.distance);
-            // }
-            // else
-            // {
-            //     ranges.Add(float.MaxValue);
-            // }
-            // }
 
            PublishImage();
 
@@ -102,6 +83,8 @@ public class HorizontalLidarScanner : MonoBehaviour
         {
             Header = new std_msgs.msg.Header
             {
+
+                // NEED TO CHANGE FIXED FRAME IN RVIZ to "Unity" (no quotes)
                 Frame_id = "Unity"
             },
 
@@ -115,7 +98,6 @@ public class HorizontalLidarScanner : MonoBehaviour
             Intensities = new float[ranges.Count],
             Ranges = ranges.ToArray(),
         };
-        Debug.Log("Publishing");
        laserScanPublisher.Publish(msg);
 
 
