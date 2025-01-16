@@ -20,7 +20,6 @@ public class HorizontalLidarScanner : MonoBehaviour
     public float scanInterval = 1f;
     public GameObject hitMarkerPrefab; // Reference to the green square prefab
     public float hitMarkerLifetime = 2f; // Lifetime of the hit marker
-    List<float> ranges = new List<float>();
 
     public int max = 10;
     public int min = 0;
@@ -50,8 +49,11 @@ public class HorizontalLidarScanner : MonoBehaviour
 
     private IEnumerator Scan()
     {
+        
+
         while (true)
         {
+            List<float> ranges = new List<float>();
             for (int i = numberOfRays; i > 0; i--)
             {
                 float angle = i * ((360f) / numberOfRays);
@@ -70,14 +72,14 @@ public class HorizontalLidarScanner : MonoBehaviour
 
             }
 
-           PublishImage();
+           PublishImage(ranges);
 
             yield return new WaitForSeconds(scanInterval);
         }
     }
 
 
-    private void PublishImage() {
+    private void PublishImage(List<float> ranges) {
 
         var msg = new sensor_msgs.msg.LaserScan
         {
