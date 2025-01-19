@@ -45,7 +45,7 @@ public class TripleAruco : MonoBehaviour
         }
 
         // Create a new material
-        arucoMaterial = new Material(Shader.Find("Standard"));
+        arucoMaterial = new Material(Shader.Find("Unlit/Texture"));
 
         // Assign the material to the existing cube
         marker1.GetComponent<Renderer>().material = arucoMaterial;

@@ -3908,6 +3908,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: ArucoMarker_75cm (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2663610940813331787, guid: 39eccc0ea27f365aa8d7e65eef53326e, type: 3}
+      propertyPath: m_CastShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2663610940813331787, guid: 39eccc0ea27f365aa8d7e65eef53326e, type: 3}
+      propertyPath: m_ReceiveShadows
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4422669343279755206, guid: 39eccc0ea27f365aa8d7e65eef53326e, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7565102474709344447, guid: 39eccc0ea27f365aa8d7e65eef53326e, type: 3}
       propertyPath: id
       value: 1
