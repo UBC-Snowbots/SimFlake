@@ -15,6 +15,7 @@ public class RGBCameraCapture : MonoBehaviour
     public int height = 1080; // Height of the image
     public int fps = 30; // Frames per second
 
+    public string frameid = "cam_unused";
     private RenderTexture renderTexture;
     private Texture2D texture2D;
 
@@ -126,7 +127,7 @@ public class RGBCameraCapture : MonoBehaviour
         // Create the ROS 2 Image message
         var imageMessage = new Image
         {
-            Header  = new std_msgs.msg.Header(){Frame_id = "camera_frame"},
+            Header  = RoverUtils.CreateHeader(frameid),
             Height = (uint)height,      //requires unsigned... doesn't matter for our usecase, can explicit cast
             Width = (uint)width,        //ditto 
             Encoding = "rgb8",            // Image encoding 

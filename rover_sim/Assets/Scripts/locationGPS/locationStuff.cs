@@ -90,20 +90,21 @@ public class LocationStuff : MonoBehaviour
         // Create a new NavSatFix message
         NavSatFix msg = new NavSatFix();
 
-        // 1. Fill the header with a ROS timestamp
-        double secs = (DateTime.UtcNow - epoch).TotalSeconds;
-        uint secsInt = (uint)secs;
-        uint nsecs = (uint)((secs - secsInt) * 1e9);
+        // // 1. Fill the header with a ROS timestamp
+        // double secs = (DateTime.UtcNow - epoch).TotalSeconds; //? Little odd, but unity sets start point as Jan 01, 0001 (start of time). All other computers think time started at Jan 1, 1970, so we subtract the amount of seconds from 0001 to 1970.
+        // // uint secsInt = (uint)secs;
+        // uint nsecs = (uint)((secs - secsInt) * 1e9);
 
-        msg.Header = new std_msgs.msg.Header
-            {
-                Frame_id = "camera_frame",
-                Stamp = new builtin_interfaces.msg.Time
-                {
-                    Sec = (int)(Time.timeSinceLevelLoad),
-                    Nanosec = (uint)((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
-                }
-            };
+        // msg.Header = new std_msgs.msg.Header
+        //     {
+        //         Frame_id = "camera_frame",
+        //         Stamp = new builtin_interfaces.msg.Time
+        //         {
+        //             Sec = (int)(secs),//(Time.timeSinceLevelLoad),
+        //             Nanosec = (uint)(nsecs)//((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
+        //         }
+        //     };
+        msg.Header = RoverUtils.CreateHeader("gnss"); //! FRAME ID
 
         // 2. Fill latitude/longitude (and altitude if available)
         msg.Latitude = currLoc.lat;   // NavSatFix expects double

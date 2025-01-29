@@ -15,6 +15,8 @@ public class DepthCameraCapture : MonoBehaviour
     public int height = 1080; // Height of the image
     public int fps = 30; // Frames per second
 
+    public string frameid = "cam_unused";
+
     private RenderTexture renderTexture;
     private Texture2D depthTexture;
 
@@ -96,15 +98,7 @@ public class DepthCameraCapture : MonoBehaviour
         // Create the ROS 2 Image message for depth
         var depthMessage = new Image
         {
-            Header = new std_msgs.msg.Header
-            {
-                Frame_id = "depth_camera_frame",
-                Stamp = new builtin_interfaces.msg.Time
-                {
-                    Sec = (int)(Time.timeSinceLevelLoad),
-                    Nanosec = (uint)((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
-                }
-            },
+            Header = RoverUtils.CreateHeader(frameid),
             Height = (uint)height,
             Width = (uint)width,
             Encoding = "32FC1", // 32-bit floating point, single channel
