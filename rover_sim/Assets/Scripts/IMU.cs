@@ -1,81 +1,81 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-// using UnitySensors.Attribute; // Removed as it does not exist
-using UnitySensors;
+using System.IO;
+using System.Threading.Tasks;
+using ROS2;
+using System.Runtime.CompilerServices;
+using sensor_msgs.msg;
+using RosSharp.RosBridgeClient;
+using RosSharp.RosBridgeClient.MessageTypes.Sensor;
+using RosSharp.RosBridgeClient.MessageTypes.Std;
 
-namespace UnitySensors.Sensor.IMU
+public class IMUPublisher : MonoBehaviour
 {
-    public class IMUSensor : MonoBehaviour
+    private ROS2Node rosNode;
+    private IPublisher<sensor_msgs.msg.Imu> imuPublisher;
+    private ROS2UnityCore ros2Unity = new ROS2UnityCore();
+    private float publishInterval = 0.1f; // Adjust the publish interval as needed
+
+    private void Start()
     {
-        private Transform _transform;
-
-        private Vector3 _position;
-        private Vector3 _velocity;
-        private Vector3 _acceleration;
-        private Quaternion _rotation;
-        private Vector3 _angularVelocity;
-
-        private Vector3 _position_tmp;
-        private Vector3 _velocity_tmp;
-        private Vector3 _acceleration_tmp;
-        private Quaternion _rotation_tmp;
-        private Vector3 _angularVelocity_tmp;
-
-        private Vector3 _position_last;
-        private Vector3 _velocity_last;
-        private Quaternion _rotation_last;
-
-        public Vector3 position { get => _position; }
-        public Vector3 velocity { get => _velocity; }
-        public Vector3 acceleration { get => _acceleration; }
-        public Quaternion rotation { get => _rotation; }
-        public Vector3 angularVelocity { get => _angularVelocity; }
-
-        public Vector3 localVelocity { get => _transform.InverseTransformDirection(_velocity); }
-        public Vector3 localAcceleration { get => _transform.InverseTransformDirection(_acceleration.normalized) * _acceleration.magnitude; }
-
-        private Vector3 _gravityDirection;
-        private float _gravityMagnitude;
-        private float _time_last;
-
-        protected void Init()
+        if (ros2Unity.Ok())
         {
-            _transform = this.transform;
-            _gravityDirection = Physics.gravity.normalized;
-            _gravityMagnitude = Physics.gravity.magnitude;
+            rosNode = ros2Unity.CreateNode("unity_imu_publisher");
+            imuPublisher = rosNode.CreatePublisher<sensor_msgs.msg.Imu>("/imu/data");
+        }
+        else
+        {
+            Debug.LogError("ROS2UnityCore is not OK");
+        }
+        StartCoroutine(PublishIMUData());
+    }
+
+    private IEnumerator PublishIMUData()
+    {
+        while (true)
+        {
+            PublishIMU();
+            yield return new WaitForSeconds(publishInterval);
+        }
+    }
+
+    private void PublishIMU()
+    {
+        if (imuPublisher == null)
+        {
+            Debug.LogError("imuPublisher is not initialized.");
+            return;
         }
 
-        protected void Update()
+        var imuMsg = new sensor_msgs.msg.Imu
         {
-            float dt = Time.deltaTime;
+            Header = new std_msgs.msg.Header  
+            {
+                Frame_id = "Unity",
 
-            _position_tmp = _transform.position;
-            _velocity_tmp = (_position_tmp - _position_last) / dt;
-            _acceleration_tmp = (_velocity_tmp - _velocity_last) / dt;
-            _acceleration_tmp -= _transform.InverseTransformDirection(_gravityDirection) * _gravityMagnitude;
+            },
+            Orientation = new geometry_msgs.msg.Quaternion
+            {
+                X = transform.rotation.x,
+                Y = transform.rotation.y,
+                Z = transform.rotation.z,
+                W = transform.rotation.w
+            },
+            Angular_velocity = new geometry_msgs.msg.Vector3
+            {
+                X = Input.gyro.rotationRateUnbiased.x,
+                Y = Input.gyro.rotationRateUnbiased.y,
+                Z = Input.gyro.rotationRateUnbiased.z
+            },
+            Linear_acceleration = new geometry_msgs.msg.Vector3
+            {
+                X = Input.acceleration.x,
+                Y = Input.acceleration.y,
+                Z = Input.acceleration.z
+            }
+        };
 
-            _rotation_tmp = _transform.rotation;
-            Quaternion rotation_delta = Quaternion.Inverse(_rotation_last) * _rotation_tmp;
-            rotation_delta.ToAngleAxis(out float angle, out Vector3 axis);
-            float angularSpeed = (angle * Mathf.Deg2Rad) / dt;
-            _angularVelocity_tmp = axis * angularSpeed;
-
-            _position_last = _position_tmp;
-            _velocity_last = _velocity_tmp;
-            _rotation_last = _rotation_tmp;
-
-        }
-
-        // protected override void UpdateSensor()
-        // {
-        //     _position = _position_tmp;
-        //     _velocity = _velocity_tmp;
-        //     _acceleration = _acceleration_tmp;
-
-        //     _rotation = _rotation_tmp;
-        //     _angularVelocity = _angularVelocity_tmp;
-
-
-        // }
-
+        imuPublisher.Publish(imuMsg);
     }
 }
