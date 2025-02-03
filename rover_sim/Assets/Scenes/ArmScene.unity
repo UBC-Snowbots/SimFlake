@@ -27809,6 +27809,7 @@ MonoBehaviour:
   - 400
   - 400
   - 400
+  ee_torque: 200
   armJoints:
   - {fileID: 519331183}
   - {fileID: 115897302}
@@ -27816,9 +27817,12 @@ MonoBehaviour:
   - {fileID: 559840806}
   - {fileID: 423113164}
   - {fileID: 876953162}
+  endEffectorLeftJoint: {fileID: 930722395}
+  endEffectorRightJoint: {fileID: 817798891}
   motorTopicName: /arm/sim_command
   jointStatesTopicName: /joint_states
   armPositionFeedbackTopicName: /arm/sim_feedback
+  endEffectorCommandTopicName: /arm/ee_command/sim
 --- !u!114 &1288985683
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -37566,6 +37570,7 @@ MonoBehaviour:
   - 40
   - 40
   - 40
+  ee_torque: 200
   armJoints:
   - {fileID: 586667244}
   - {fileID: 1428169302}
@@ -37573,9 +37578,12 @@ MonoBehaviour:
   - {fileID: 1507512486}
   - {fileID: 41876679}
   - {fileID: 1201822266}
+  endEffectorLeftJoint: {fileID: 0}
+  endEffectorRightJoint: {fileID: 0}
   motorTopicName: /arm/sim_command
   jointStatesTopicName: /joint_states
   armPositionFeedbackTopicName: /arm/sim_feedback
+  endEffectorCommandTopicName: /arm/ee_command/sim
 --- !u!114 &1978296906
 MonoBehaviour:
   m_ObjectHideFlags: 0

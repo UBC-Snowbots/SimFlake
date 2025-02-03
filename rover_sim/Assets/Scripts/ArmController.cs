@@ -61,7 +61,7 @@ public class ArmController : MonoBehaviour
     [SerializeField]
     float[] torque = new float[]{200, 300, 300, 400, 400, 400};
     [SerializeField]
-    float ee_torque = 200;
+    float ee_torque = 0.5F;
 
     // Arm joints
     [SerializeField]
