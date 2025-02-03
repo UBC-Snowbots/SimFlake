@@ -284,7 +284,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -4495,7 +4495,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -4820,7 +4820,6 @@ Transform:
   m_Children:
   - {fileID: 1085957174}
   - {fileID: 868764229}
-  - {fileID: 519331179}
   m_Father: {fileID: 1288985684}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &182742791
@@ -8449,7 +8448,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -10618,7 +10617,7 @@ Transform:
   - {fileID: 420414491}
   - {fileID: 598907585}
   - {fileID: 115897298}
-  m_Father: {fileID: 182742790}
+  m_Father: {fileID: 1751950207}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &519331180
 MonoBehaviour:
@@ -10649,7 +10648,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayInertiaGizmo: 0
-  useUrdfData: 1
+  useUrdfData: 0
   centerOfMass: {x: -0.049733777, y: 0.015107845, z: -0.005921885}
   inertiaTensor: {x: 0.0006443114, y: 0.0008799947, z: 0.000956193}
   inertiaTensorRotation: {x: 0.83915544, y: -0.54389113, z: -0.0006663517, w: -0.0004318785}
@@ -10697,7 +10696,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -11807,7 +11806,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -16851,7 +16850,7 @@ ArticulationBody:
     forceLimit: 1
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 2
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -17205,7 +17204,7 @@ ArticulationBody:
     forceLimit: 1.5
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 3
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -17501,7 +17500,7 @@ ArticulationBody:
     forceLimit: 1
     target: 0
     targetVelocity: 0
-    driveType: 0
+    driveType: 2
   m_YDrive:
     lowerLimit: 0
     upperLimit: 0
@@ -27775,6 +27774,7 @@ GameObject:
   - component: {fileID: 1288985684}
   - component: {fileID: 1288985683}
   - component: {fileID: 1288985682}
+  - component: {fileID: 1288985685}
   m_Layer: 0
   m_Name: dev_arm
   m_TagString: robot
@@ -27852,6 +27852,28 @@ Transform:
   - {fileID: 182742790}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1288985685
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1288985681}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d607ea46a579d44c4b19a6322ce4b9b2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  selectedJoint: 
+  selectedIndex: 0
+  control: 0
+  stiffness: 0
+  damping: 0
+  forceLimit: 0
+  speed: 5
+  torque: 100
+  acceleration: 5
+  highLightColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!64 &1317088401
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -33593,7 +33615,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 7140430634709161695, guid: d64b42c95bbfc1158b7fb09976f8d29a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 519331179}
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: d64b42c95bbfc1158b7fb09976f8d29a, type: 3}
 --- !u!4 &1751950207 stripped
@@ -37453,12 +37478,12 @@ GameObject:
   - component: {fileID: 1978296905}
   - component: {fileID: 1978296906}
   m_Layer: 0
-  m_Name: dev_arm
+  m_Name: dev_arm_OLD_NO_GRIPPER
   m_TagString: robot
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1978296902
 MonoBehaviour:
   m_ObjectHideFlags: 0
