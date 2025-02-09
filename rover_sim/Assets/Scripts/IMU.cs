@@ -33,7 +33,7 @@ public class IMUPublisher : MonoBehaviour
             Debug.LogError("ROS2UnityCore is not OK");
         }
 
-        past = new System.Numerics.Vector3(0, 0, 0);
+        past = new UnityEngine.Vector3(0, 0, 0);
         StartCoroutine(PublishIMUData());
     }
 
