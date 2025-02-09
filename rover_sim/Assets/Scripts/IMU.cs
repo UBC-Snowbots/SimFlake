@@ -42,6 +42,8 @@ public class IMUPublisher : MonoBehaviour
 
     private void PublishIMU()
     {
+
+        Debug.Log(GetComponent<Rigidbody>().angularVelocity.x);
         if (imuPublisher == null)
         {
             Debug.LogError("imuPublisher is not initialized.");
@@ -57,16 +59,16 @@ public class IMUPublisher : MonoBehaviour
             },
             Orientation = new geometry_msgs.msg.Quaternion
             {
-                X = transform.rotation.x,
-                Y = transform.rotation.y,
-                Z = transform.rotation.z,
-                W = transform.rotation.w
+                X = transform.localRotation.x,
+                Y = transform.localRotation.y,
+                Z = transform.localRotation.z,
+                W = transform.localRotation.w
             },
             Angular_velocity = new geometry_msgs.msg.Vector3
             {
-                X = Input.gyro.rotationRateUnbiased.x,
-                Y = Input.gyro.rotationRateUnbiased.y,
-                Z = Input.gyro.rotationRateUnbiased.z
+                X = GetComponent<Rigidbody>().angularVelocity.x,
+                Y = GetComponent<Rigidbody>().angularVelocity.y,
+                Z = GetComponent<Rigidbody>().angularVelocity.z
             },
             Linear_acceleration = new geometry_msgs.msg.Vector3
             {
