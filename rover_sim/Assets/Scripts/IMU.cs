@@ -9,6 +9,7 @@ using sensor_msgs.msg;
 using RosSharp.RosBridgeClient;
 using RosSharp.RosBridgeClient.MessageTypes.Sensor;
 using RosSharp.RosBridgeClient.MessageTypes.Std;
+using System.Numerics;
 
 public class IMUPublisher : MonoBehaviour
 {
@@ -16,6 +17,9 @@ public class IMUPublisher : MonoBehaviour
     private IPublisher<sensor_msgs.msg.Imu> imuPublisher;
     private ROS2UnityCore ros2Unity = new ROS2UnityCore();
     private float publishInterval = 0.1f; // Adjust the publish interval as needed
+
+
+    private UnityEngine.Vector3 past;
 
     private void Start()
     {
@@ -28,6 +32,8 @@ public class IMUPublisher : MonoBehaviour
         {
             Debug.LogError("ROS2UnityCore is not OK");
         }
+
+        past = new System.Numerics.Vector3(0, 0, 0);
         StartCoroutine(PublishIMUData());
     }
 
@@ -49,6 +55,8 @@ public class IMUPublisher : MonoBehaviour
             Debug.LogError("imuPublisher is not initialized.");
             return;
         }
+
+
 
         var imuMsg = new sensor_msgs.msg.Imu
         {
@@ -72,11 +80,13 @@ public class IMUPublisher : MonoBehaviour
             },
             Linear_acceleration = new geometry_msgs.msg.Vector3
             {
-                X = Input.acceleration.x,
-                Y = Input.acceleration.y,
-                Z = Input.acceleration.z
+                X = (GetComponent<Rigidbody>().angularVelocity.x - past.x) /.1,
+                Y = (GetComponent<Rigidbody>().angularVelocity.y - past.y) /.1,
+                Z = (GetComponent<Rigidbody>().angularVelocity.z - past.z) /.1
             }
         };
+
+        past = GetComponent<Rigidbody>().angularVelocity;
 
         imuPublisher.Publish(imuMsg);
     }
