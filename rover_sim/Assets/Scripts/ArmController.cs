@@ -267,8 +267,8 @@ private readonly object endEffectorQueueLock = new object(); // Lock for thread 
         double end_effector_cmd = msg.Data;
         var Ldrive = endEffectorLeftJoint.xDrive;
         var Rdrive = endEffectorRightJoint.xDrive;
-        Ldrive.target = (float)end_effector_cmd * -1;
-        Rdrive.target = (float)end_effector_cmd;
+        Ldrive.targetVelocity = (float)end_effector_cmd * -1;
+        Rdrive.targetVelocity = (float)end_effector_cmd;
         endEffectorLeftJoint.xDrive = Ldrive;
         endEffectorRightJoint.xDrive = Rdrive;
         print("End Effector Controlled");
