@@ -37,7 +37,7 @@ public class LocationStuff : MonoBehaviour
     IEnumerator Start()
     {
         // Simulate starting position as 0, 0 in local GPS coordinates
-        startLoc = new GPSLoc(49, -123f);
+        startLoc = new GPSLoc(-123f, 49f);
         startPosition = transform.position;//object_to_track.position;
 
         debugTxt.text = "Initializing GPS...";
