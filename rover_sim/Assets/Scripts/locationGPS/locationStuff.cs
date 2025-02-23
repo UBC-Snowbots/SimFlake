@@ -37,8 +37,8 @@ public class LocationStuff : MonoBehaviour
     IEnumerator Start()
     {
         // Simulate starting position as 0, 0 in local GPS coordinates
-        startLoc = new GPSLoc(0, 0);
-        startPosition = object_to_track.position;
+        startLoc = new GPSLoc(49, -123f);
+        startPosition = transform.position;//object_to_track.position;
 
         debugTxt.text = "Initializing GPS...";
         yield return new WaitForSeconds(2);  // Simulate a brief delay for GPS startup
@@ -62,8 +62,8 @@ public class LocationStuff : MonoBehaviour
         if (gps_ok)
         {
             // Calculate new local GPS coordinates relative to starting position
-            currLoc.lat = (object_to_track.position.x - startPosition.x) * 0.0001f;  // Scale factor for lat
-            currLoc.lon = (object_to_track.position.z - startPosition.z) * 0.0001f;  // Scale factor for lon
+            currLoc.lat = startLoc.lat + (object_to_track.position.x - startPosition.x) * 0.0001f;  // Scale factor for lat
+            currLoc.lon = startLoc.lon + (object_to_track.position.z - startPosition.z) * 0.0001f;  // Scale factor for lon
 
             debugTxt.text = "Current Location: \nLat: " + currLoc.lat.ToString("F6") 
                           + "\nLon: " + currLoc.lon.ToString("F6");

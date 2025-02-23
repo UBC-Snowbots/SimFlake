@@ -20,13 +20,11 @@ public class ArmController : MonoBehaviour
     // private ROS2UnityComponent ros2Unity
     private ROS2Node rosNode;
     private ISubscription<std_msgs.msg.Float64MultiArray> armSub;
-    private ISubscription<geometry_msgs.msg.Twist> cmdVelSub;
+    private ISubscription<std_msgs.msg.Float64> endEffectorSub;
 
         //For arm feedback
     private IPublisher<std_msgs.msg.Float64MultiArray> position_pubber;
     private IPublisher<sensor_msgs.msg.JointState> joint_state_pubber;
-
-
 
     // Motor command array size
     private const int NUM_AXES = 6;
@@ -62,10 +60,18 @@ public class ArmController : MonoBehaviour
 
     [SerializeField]
     float[] torque = new float[]{200, 300, 300, 400, 400, 400};
+    [SerializeField]
+    float ee_torque = 0.5F;
 
-    // Wheel joints
+    // Arm joints
     [SerializeField]
     private ArticulationBody[] armJoints = new ArticulationBody[NUM_AXES];
+
+    // End Effector, broken into 2 so we know which is right / left
+    [SerializeField]
+    private ArticulationBody endEffectorLeftJoint; //= new ArticulationBody;
+    [SerializeField]
+    private ArticulationBody endEffectorRightJoint; //= new ArticulationBody;
 
     // ROS2 Topic Names
     [SerializeField]
@@ -75,8 +81,10 @@ public class ArmController : MonoBehaviour
 
     [SerializeField]
     private string armPositionFeedbackTopicName = "/arm/sim_feedback";
-
-
+    [SerializeField]
+    private string endEffectorCommandTopicName = "/arm/ee_command/sim";
+    // [SerializeField] //? Should just pub to joint_states
+    // private string endEffectorFeedbackTopicName = "/arm/ee_feedback/sim";
     private double[] current_positions = new double[]{0, 0, 0, 0, 0, 0};
     private double[] current_velocities = new double[]{0, 0, 0, 0, 0, 0};
 
@@ -87,11 +95,14 @@ public class ArmController : MonoBehaviour
 
     private double time_elapsed;
 private Queue<std_msgs.msg.Float64MultiArray> motorCommandQueue = new Queue<std_msgs.msg.Float64MultiArray>();
+private Queue<std_msgs.msg.Float64> endEffectorQueue = new Queue<std_msgs.msg.Float64>();
 private readonly object queueLock = new object(); // Lock for thread safety
+private readonly object endEffectorQueueLock = new object(); // Lock for thread safety
+
 
     void Start()
     {
-                        print("Arm Start");
+                        print("Arm with End Effector Start");
 
         // Initialize ROS2
         if (ros2Unity.Ok())
@@ -102,6 +113,10 @@ private readonly object queueLock = new object(); // Lock for thread safety
                 motorTopicName,
                 msg => MotorCommandCallback(msg)
                 );
+            endEffectorSub = rosNode.CreateSubscription<std_msgs.msg.Float64>(
+                endEffectorCommandTopicName,
+                msg => endEffectorCallback(msg)
+            );
 
             //! DONT Subscribe to cmd_vel topic
             // cmdVelSub = rosNode.CreateSubscription<geometry_msgs.msg.Twist>(
@@ -146,6 +161,18 @@ private readonly object queueLock = new object(); // Lock for thread safety
             }
         }
 
+    endEffectorLeftJoint.jointFriction = 1;
+    endEffectorLeftJoint.angularDamping = 1;
+    endEffectorRightJoint.jointFriction = 1;
+    endEffectorRightJoint.angularDamping = 1;
+    ArticulationDrive eeLeftDrive = endEffectorLeftJoint.xDrive;
+    ArticulationDrive eeRightDrive = endEffectorRightJoint.xDrive;
+    eeLeftDrive.forceLimit = ee_torque;
+    eeRightDrive.forceLimit = ee_torque;
+    endEffectorLeftJoint.xDrive = eeLeftDrive;
+    endEffectorRightJoint.xDrive = eeRightDrive;
+
+
     }
 
     // Update method may not be necessary if ROS2UnityCore handles spinning
@@ -157,6 +184,15 @@ private readonly object queueLock = new object(); // Lock for thread safety
         {
             var msg = motorCommandQueue.Dequeue();
             DriveMotors(msg); //Cannot be called directly from callback, so needs callback to just trigger a queue
+        }
+    }
+
+        lock (endEffectorQueueLock)
+    {
+        while (endEffectorQueue.Count > 0)
+        {
+            var msg = endEffectorQueue.Dequeue();
+            controlEndEffector(msg); //!Cannot be called directly from callback, so needs callback to just trigger a queue
         }
     }
 
@@ -172,17 +208,17 @@ private readonly object queueLock = new object(); // Lock for thread safety
     feedback_msg.Data = new double[NUM_AXES];
     feedback_msg.Data = current_positions;
     position_pubber.Publish(feedback_msg);
-// Define the Unix epoch
-DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
+// // Define the Unix epoch
 // DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-DateTime currentTime = DateTime.UtcNow;
-double timeSinceEpoch = (currentTime - unixEpoch).TotalSeconds;
-int sec = (int)currentTime.Second + (int)timeSinceEpoch;
-uint nanosec = (uint)currentTime.Ticks;//(uint)(((currentTime.Second - (uint)currentTime.Second) * 1e9));
+
+// // DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+// DateTime currentTime = DateTime.UtcNow;
+// double timeSinceEpoch = (currentTime - unixEpoch).TotalSeconds;
+// int sec = (int)currentTime.Second + (int)timeSinceEpoch;
+// uint nanosec = (uint)currentTime.Ticks;//(uint)(((currentTime.Second - (uint)currentTime.Second) * 1e9));
     sensor_msgs.msg.JointState joint_state_msg = new sensor_msgs.msg.JointState();
-    joint_state_msg.Header.Stamp.Sec = sec;
-    joint_state_msg.Header.Stamp.Nanosec = nanosec;
+    joint_state_msg.Header = RoverUtils.CreateHeader("ee");
+   
 
     joint_state_msg.Name = new string[NUM_AXES];
     joint_state_msg.Position = new double[NUM_AXES];
@@ -227,6 +263,16 @@ uint nanosec = (uint)currentTime.Ticks;//(uint)(((currentTime.Second - (uint)cur
             }
         }
      }
+     private void controlEndEffector(std_msgs.msg.Float64 msg){
+        double end_effector_cmd = msg.Data;
+        var Ldrive = endEffectorLeftJoint.xDrive;
+        var Rdrive = endEffectorRightJoint.xDrive;
+        Ldrive.targetVelocity = (float)end_effector_cmd * -1;
+        Rdrive.targetVelocity = (float)end_effector_cmd;
+        endEffectorLeftJoint.xDrive = Ldrive;
+        endEffectorRightJoint.xDrive = Rdrive;
+        print("End Effector Controlled");
+     }
 
     // Callback for motor commands
     public void MotorCommandCallback(std_msgs.msg.Float64MultiArray msg)
@@ -238,6 +284,11 @@ lock (queueLock){
 }
 
  
+    }
+    public void endEffectorCallback(std_msgs.msg.Float64 msg){
+        lock(endEffectorQueueLock){
+            endEffectorQueue.Enqueue(msg);
+        }
     }
 
 }
