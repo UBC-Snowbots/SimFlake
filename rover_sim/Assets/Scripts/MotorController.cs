@@ -13,7 +13,6 @@ using System;
 // using std_msgs = std_msgs.msg;
 // using geometry_msgs = geometry_msgs.msg;
 
-
 public class MotorController : MonoBehaviour
 {
     // ROS2 Node and Subscribers
@@ -64,6 +63,8 @@ public class MotorController : MonoBehaviour
     [SerializeField]
     private string cmdVelTopicName = "/cmd_vel";
 
+    [SerializeField]
+    private double wheel_radius_meters = 0.3; //* Not exact, just arbritrary placeholder for now.
 
 private Queue<std_msgs.msg.Float64MultiArray> motorCommandQueue = new Queue<std_msgs.msg.Float64MultiArray>();
 private readonly object queueLock = new object(); // Lock for thread safety
@@ -182,12 +183,13 @@ lock (queueLock){
  
         double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
         double angular = msg.Angular.Z;
-
-
+        double wheel_degPerSec_coeff =  360/wheel_radius_meters * 3.14/2 * 0.01; //? Math is not right
+        linear = linear * wheel_degPerSec_coeff;
+        angular = angular * wheel_degPerSec_coeff;
         //RIGHT is the inverse motor control of regular b/c motors dk what side they're on
         // counterclockwise = positive velocity
         double right = linear*-1 + angular;
-        double left = linear - angular;
+        double left = linear + angular;
    // std_msgs.msg.Float64MultiArray test_msg;
         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
 

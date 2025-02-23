@@ -21,6 +21,7 @@ public class HorizontalLidarScanner : MonoBehaviour
     public GameObject hitMarkerPrefab; // Reference to the green square prefab
     public float hitMarkerLifetime = 2f; // Lifetime of the hit marker
 
+    public string frameid = "lidar"; //? ROS2 TransForm (TF) frame
     public int max = 10;
     public int min = 0;
 
@@ -83,12 +84,7 @@ public class HorizontalLidarScanner : MonoBehaviour
 
         var msg = new sensor_msgs.msg.LaserScan
         {
-            Header = new std_msgs.msg.Header
-            {
-
-                // NEED TO CHANGE FIXED FRAME IN RVIZ to "Unity" (no quotes)
-                Frame_id = "Unity"
-            },
+            Header = RoverUtils.CreateHeader(frameid),
 
             Range_min = min,
             Range_max = max,
