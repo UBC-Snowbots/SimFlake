@@ -7,6 +7,7 @@ using ROS2;
 using System.Runtime.CompilerServices;
 using sensor_msgs.msg;
 using std_msgs.msg;
+using UnityEngine.Rendering;
 
 public class RGBCameraCapture : MonoBehaviour
 {
@@ -55,9 +56,6 @@ public class RGBCameraCapture : MonoBehaviour
 
 
         StartCoroutine(CaptureAndPublishImages());
-
-
-
     }
 
 
@@ -100,28 +98,30 @@ public class RGBCameraCapture : MonoBehaviour
         // Render the camera's view to the RenderTexture
         rgbCamera.Render();
 
-        // Read the RenderTexture into the Texture2D
-        RenderTexture.active = renderTexture;
-        texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        texture2D.Apply();
-        RenderTexture.active = null;
-
-        // Convert the Texture2D to a byte array
-        //texture2D.Compress(false);
-        byte[] imageBytes = texture2D.GetRawTextureData();
-
-
-        
-        
-        //return byte array
-        PublishImage(imageBytes);
-        
+        // Read the rendered bytes to CPU, async read to avoid stalling the CPU and blowing up framerate
+        AsyncGPUReadback.Request(renderTexture, 0, TextureFormat.RGB24, OnCompleteReadback); 
     }
 
+    //call back function when bytes are read async
+    void OnCompleteReadback(AsyncGPUReadbackRequest request)
+    {
+        if (request.hasError)
+        {
+            Debug.LogWarning("GPU readback error detected!");
+            return;
+        }
 
+        // Get the data from GPU memory (non-blocking)
+        var rawData = request.GetData<byte>();
+
+        byte[] imageBytes = rawData.ToArray();
+
+        // Publish to ROS 2
+        PublishImage(imageBytes);
+    }
 
     //publishing single image to ROS..
-     private void PublishImage(byte[] imageBytes)
+    private void PublishImage(byte[] imageBytes)
     {
 
         // Create the ROS 2 Image message
@@ -142,8 +142,4 @@ public class RGBCameraCapture : MonoBehaviour
     }
 
 
-    
-
-
- 
 }
