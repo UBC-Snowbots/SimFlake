@@ -127,6 +127,10 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 - Ubuntu 24.04 has no `libdl.so` symlink; the URDF importer's Assimp (COLLADA `.dae` only) needs it. `setup.sh` offers
   to create it. STL meshes and VHACD colliders work without it (tested: dev_arm imports to a prefab headless).
 - Don't `pkill -f <pattern>` from a shell whose own command line contains the pattern. It kills itself.
+- Stopping Play while the launch shell is still reading `~/.bashrc` used to interrupt RoverFlake2's `setup.bash`
+  halfway (so no `ROS_DOMAIN_ID`/RMW) and leave an orphaned rosbridge on domain 0 that every later Play connected to.
+  `RosBridgeLauncher` now runs with `set +m` and SIGKILLs the whole session on stop. If topics vanish, check the
+  `[rosbridge] starting rosbridge (... ROS_DOMAIN_ID=...)` line in the Console.
 - The arm listens on `/arm/command` directly (needs `rover_msgs`, i.e. RoverFlake2 sourced for rosbridge). The sim has no
   limit switches or differential wrist: 'H' drives axes back to the URDF zero, motor-space commands are treated as axis space.
   The HMI's status panels read `/arm/moteus_feedback`, which the sim does not publish (yet).
