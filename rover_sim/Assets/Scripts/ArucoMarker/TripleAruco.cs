@@ -45,7 +45,9 @@ public class TripleAruco : MonoBehaviour
         }
 
         // Create a new material
-        arucoMaterial = new Material(Shader.Find("Unlit/Texture"));
+        // Resources/ArucoUnlit.mat keeps the unlit shader in standalone builds (Shader.Find alone returns null there).
+        var template = Resources.Load<Material>("ArucoUnlit");
+        arucoMaterial = template != null ? new Material(template) : new Material(Shader.Find("Unlit/Texture"));
 
         // Assign the material to the existing cube
         marker1.GetComponent<Renderer>().material = arucoMaterial;

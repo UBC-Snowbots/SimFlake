@@ -1,343 +1,290 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using ROS2;
 using System;
-// using GameObject;
+using System.Collections.Generic;
+using SimFlake.Ros;
+using UnityEngine;
 
-//TODO Figure out
-    //? Unity uses degrees or rads?
-    //? 
-
-// Import ROS2 message types with aliases to avoid conflicts
-// using std_msgs = std_msgs.msg;
-// using geometry_msgs = geometry_msgs.msg;
-
-
+/// <summary>
+/// Simulated arm (6 axes + 2-finger end effector). Listens to the same topic as the real arm driver,
+/// so the RoverFlake2 HMI / joystick / MoveIt bridge drive it directly. sim_helper is not needed.
+///
+/// Subscribes:
+///   /arm/command          rover_msgs/ArmCommand       same contract as moteus_driver_node (arm_commands.h):
+///                           'V' velocities[7] deg/s (NaN = leave that axis alone, index 6 = end effector)
+///                           'P' positions[7] output revs, velocities[7] deg/s travel speed (NaN = axis max)
+///                           'S' stop (positions[] empty = all, else non-NaN entries)
+///                           'Z' zero the selected axes where they are, 'H' "home" (moves to the sim's zero)
+///                           'G' legacy gripper command (end_effector)
+///   /arm/sim_command      std_msgs/Float64MultiArray  legacy sim_helper output, ignored while /arm/command is active
+///   /arm/ee_command/sim   std_msgs/Float64            legacy gripper command, same rule
+/// Publishes:
+///   /arm/sim_feedback     std_msgs/Float64MultiArray  6 joint positions [rad]
+///   /joint_states         sensor_msgs/JointState      joint_1..joint_6 positions [rad] / velocities [rad/s]
+/// </summary>
 public class ArmController : MonoBehaviour
 {
-    // ROS2 Node and Subscribers
-    // private ROS2UnityComponent ros2Unity
-    private ROS2Node rosNode;
-    private ISubscription<std_msgs.msg.Float64MultiArray> armSub;
-    private ISubscription<std_msgs.msg.Float64> endEffectorSub;
+    private const int NUM_AXES = 6;   // arm joints
+    private const int EE = 6;         // end effector index in ArmCommand arrays
+    private const int NUM_CMD = 7;    // axes + end effector
 
-        //For arm feedback
-    private IPublisher<std_msgs.msg.Float64MultiArray> position_pubber;
-    private IPublisher<sensor_msgs.msg.JointState> joint_state_pubber;
-
-    // Motor command array size
-    private const int NUM_AXES = 6;
-        ROS2UnityCore ros2Unity = new ROS2UnityCore();
-
-    // Wheel joint names in the same order as motor commands
-    [SerializeField]
-    private int[] motor_dirs = new int[NUM_AXES]{
-        1, //axis 1
-        -1,  
-        1,
-        1,
-        -1,
-        1
-
-    };
+    [SerializeField] private int[] motor_dirs = { 1, -1, 1, 1, -1, 1 };
 
     [SerializeField]
-    private string[] armLinkNames = new string[NUM_AXES] {
-        "link_1",
-        "link_2",
-        "link_3",
-        "link_4",
-        "link_5",
-        "link_6"
-    };
-        //  "back_left_wheel_link", //Original Layout
-        // "back_right_wheel_link",
-        // "left_front_wheel_link",
-        // "left_mid_wheel_link",
-        // "right_front_wheel_link",
-        // "right_mid_wheel_link"
+    private string[] armLinkNames = { "link_1", "link_2", "link_3", "link_4", "link_5", "link_6" };
 
-    [SerializeField]
-    float[] torque = new float[]{200, 300, 300, 400, 400, 400};
-    [SerializeField]
-    float ee_torque = 0.5F;
+    [SerializeField] float[] torque = { 200, 300, 300, 400, 400, 400 };
+    [SerializeField] float ee_torque = 0.5F;
 
-    // Arm joints
-    [SerializeField]
-    private ArticulationBody[] armJoints = new ArticulationBody[NUM_AXES];
+    [Tooltip("Assigned in the inspector; found by armLinkNames if left empty.")]
+    [SerializeField] private ArticulationBody[] armJoints = new ArticulationBody[NUM_AXES];
+    [SerializeField] private ArticulationBody endEffectorLeftJoint;
+    [SerializeField] private ArticulationBody endEffectorRightJoint;
 
-    // End Effector, broken into 2 so we know which is right / left
-    [SerializeField]
-    private ArticulationBody endEffectorLeftJoint; //= new ArticulationBody;
-    [SerializeField]
-    private ArticulationBody endEffectorRightJoint; //= new ArticulationBody;
+    [Header("Topics")]
+    [SerializeField] private string armCommandTopicName = "/arm/command";
+    [SerializeField] private string motorTopicName = "/arm/sim_command";
+    [SerializeField] private string jointStatesTopicName = "/joint_states";
+    [SerializeField] private string armPositionFeedbackTopicName = "/arm/sim_feedback";
+    [SerializeField] private string endEffectorCommandTopicName = "/arm/ee_command/sim";
+    [SerializeField] private float feedbackRateHz = 50f;
 
-    // ROS2 Topic Names
-    [SerializeField]
-    private string motorTopicName = "/arm/sim_command";
-    [SerializeField]
-    private string jointStatesTopicName = "/joint_states";
+    // Joint names on the ROS side (MoveIt), not the Unity link names.
+    [SerializeField] private string[] moveit_joint_names = { "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6" };
 
-    [SerializeField]
-    private string armPositionFeedbackTopicName = "/arm/sim_feedback";
-    [SerializeField]
-    private string endEffectorCommandTopicName = "/arm/ee_command/sim";
-    // [SerializeField] //? Should just pub to joint_states
-    // private string endEffectorFeedbackTopicName = "/arm/ee_feedback/sim";
-    private double[] current_positions = new double[]{0, 0, 0, 0, 0, 0};
-    private double[] current_velocities = new double[]{0, 0, 0, 0, 0, 0};
+    [Header("Command handling")]
+    [Tooltip("Finger travel (m) per degree of end-effector motor rotation. 0.0005 = full stroke in ~1 s at the real EE max speed (0.5 rev/s).")]
+    [SerializeField] private float eeMetersPerDegree = 0.0005f;
+    [Tooltip("Speed cap (deg/s) for 'P' moves that don't give one. Real arm: 0.1 rev/s for axes, 0.5 rev/s for the EE.")]
+    [SerializeField] private float[] maxSpeedDegPerSec = { 36, 36, 36, 36, 36, 36, 180 };
+    [Tooltip("Position-move gain (1/s): commanded speed = gain * error, capped by the move speed.")]
+    [SerializeField] private float positionGain = 4f;
+    [Tooltip("Velocity drives with damping 0 produce no torque; this damping is used for those.")]
+    [SerializeField] private float jointDriveDamping = 1000f;
 
+    enum Mode { Velocity, Position }
+    readonly Mode[] mode = new Mode[NUM_CMD];
+    readonly double[] velCmd = new double[NUM_CMD];    // deg/s, axis frame
+    readonly double[] posTarget = new double[NUM_CMD]; // deg, axis frame
+    readonly double[] posSpeed = new double[NUM_CMD];  // deg/s
+    readonly double[] zeroDeg = new double[NUM_CMD];   // reading offset set by 'Z'
+    float lastArmCommandTime = -100f;
+    bool warnedMotorSpace;
+    readonly HashSet<byte> warnedTypes = new HashSet<byte>();
 
-    
-    private string[] moveit_joint_names = new string[]{"joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6"}; //? newest (Sep 2024) arm urdf - For ros2 side, not unity joint names
-
-
-    private double time_elapsed;
-private Queue<std_msgs.msg.Float64MultiArray> motorCommandQueue = new Queue<std_msgs.msg.Float64MultiArray>();
-private Queue<std_msgs.msg.Float64> endEffectorQueue = new Queue<std_msgs.msg.Float64>();
-private readonly object queueLock = new object(); // Lock for thread safety
-private readonly object endEffectorQueueLock = new object(); // Lock for thread safety
-
+    RosPublisher<std_msgs.msg.Float64MultiArray> positionPub;
+    RosPublisher<sensor_msgs.msg.JointState> jointStatePub;
+    float feedbackTimer;
 
     void Start()
     {
-                        print("Arm with End Effector Start");
-
-        // Initialize ROS2
-        if (ros2Unity.Ok())
-        {
-            rosNode = ros2Unity.CreateNode("unity_arm_controller");
-            // Subscribe to motor commands topic
-            armSub = rosNode.CreateSubscription<std_msgs.msg.Float64MultiArray>(
-                motorTopicName,
-                msg => MotorCommandCallback(msg)
-                );
-            endEffectorSub = rosNode.CreateSubscription<std_msgs.msg.Float64>(
-                endEffectorCommandTopicName,
-                msg => endEffectorCallback(msg)
-            );
-
-            //! DONT Subscribe to cmd_vel topic
-            // cmdVelSub = rosNode.CreateSubscription<geometry_msgs.msg.Twist>(
-            //     cmdVelTopicName,
-            //     msg => CmdVelCallback(msg)
-            // );
-
-            position_pubber = rosNode.CreatePublisher<std_msgs.msg.Float64MultiArray>(armPositionFeedbackTopicName);
-
-            joint_state_pubber = rosNode.CreatePublisher<sensor_msgs.msg.JointState>(jointStatesTopicName);
-        }
-        else
-        {
-            Debug.LogError("ROS2UnityCore is not OK");
-        }
-
-        // Find and store the wheel joints
         for (int i = 0; i < NUM_AXES; i++)
         {
-            string jointName = armLinkNames[i];
-            
-            GameObject jointObject = GameObject.Find(jointName);
-
-            if (jointObject != null)
+            if (armJoints[i] == null)
             {
-                // armJoints[i] = jointObject.GetComponent<ArticulationBody>(); //! Articulation body is set manually in unity, after script has been placed on arm
-                // armJoints[i].gameObject.AddComponent<JointControl>();
-                armJoints[i].jointFriction = 1;
-                armJoints[i].angularDamping = 1;
-                ArticulationDrive drive = armJoints[i].xDrive;
-                drive.forceLimit = torque[i];
-                armJoints[i].xDrive = drive;
-                // JointControl currentDrive = wheelJoints.xDrive;
-                if (armJoints[i] == null)
-                {
-                    Debug.LogError($"ArticulationBody not found on joint {jointName}");
-                }
+                var go = GameObject.Find(armLinkNames[i]);
+                if (go != null) armJoints[i] = go.GetComponent<ArticulationBody>();
             }
-            else
+            if (armJoints[i] == null)
             {
-                Debug.LogError($"Joint {jointName} not found in the scene");
+                Debug.LogError($"[ArmController] Joint '{armLinkNames[i]}' not found");
+                continue;
             }
+            SetupDrive(armJoints[i], torque[i]);
         }
+        SetupDrive(endEffectorLeftJoint, ee_torque);
+        SetupDrive(endEffectorRightJoint, ee_torque);
 
-    endEffectorLeftJoint.jointFriction = 1;
-    endEffectorLeftJoint.angularDamping = 1;
-    endEffectorRightJoint.jointFriction = 1;
-    endEffectorRightJoint.angularDamping = 1;
-    ArticulationDrive eeLeftDrive = endEffectorLeftJoint.xDrive;
-    ArticulationDrive eeRightDrive = endEffectorRightJoint.xDrive;
-    eeLeftDrive.forceLimit = ee_torque;
-    eeRightDrive.forceLimit = ee_torque;
-    endEffectorLeftJoint.xDrive = eeLeftDrive;
-    endEffectorRightJoint.xDrive = eeRightDrive;
-
-
+        Ros.Subscribe<rover_msgs.msg.ArmCommand>(armCommandTopicName, ArmCommandCallback);
+        Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback);
+        Ros.Subscribe<std_msgs.msg.Float64>(endEffectorCommandTopicName, endEffectorCallback);
+        positionPub = Ros.Advertise<std_msgs.msg.Float64MultiArray>(armPositionFeedbackTopicName, 2);
+        jointStatePub = Ros.Advertise<sensor_msgs.msg.JointState>(jointStatesTopicName, 2);
     }
 
-    // Update method may not be necessary if ROS2UnityCore handles spinning
-    void Update()
-    {  
-        lock (queueLock)
+    void SetupDrive(ArticulationBody j, float forceLimit)
     {
-        while (motorCommandQueue.Count > 0)
-        {
-            var msg = motorCommandQueue.Dequeue();
-            DriveMotors(msg); //Cannot be called directly from callback, so needs callback to just trigger a queue
-        }
+        if (j == null) return;
+        j.jointFriction = 1;
+        j.angularDamping = 1;
+        var d = j.xDrive;
+        d.forceLimit = forceLimit;
+        if (d.damping <= 0) d.damping = jointDriveDamping;
+        j.xDrive = d;
     }
 
-        lock (endEffectorQueueLock)
+    // ---- joint access in the "axis frame" (degrees, same sign/zero as the commands) ----
+
+    bool Has(int i) => i == EE ? endEffectorLeftJoint != null && endEffectorRightJoint != null : armJoints[i] != null;
+
+    double Reading(int i)
     {
-        while (endEffectorQueue.Count > 0)
+        if (i == EE)
         {
-            var msg = endEffectorQueue.Dequeue();
-            controlEndEffector(msg); //!Cannot be called directly from callback, so needs callback to just trigger a queue
+            var r = endEffectorRightJoint;
+            return (r.jointPosition.dofCount > 0 ? r.jointPosition[0] : 0) / eeMetersPerDegree - zeroDeg[i];
         }
+        var j = armJoints[i];
+        double deg = j.jointPosition.dofCount > 0 ? j.jointPosition[0] * Mathf.Rad2Deg : 0;
+        return deg * motor_dirs[i] - zeroDeg[i];
     }
 
-    for(int i = 0; i < NUM_AXES; i++){
-    ArticulationReducedSpace joint_position = armJoints[i].jointPosition;
-    ArticulationReducedSpace joint_velocity = armJoints[i].jointVelocity;
-    current_positions[i] = joint_position[0] * motor_dirs[i];
-    current_velocities[i] = joint_velocity[0] * motor_dirs[i];
-
-    }
-    // time_elapsed += Time.deltaTime; //* can add a timer, but would be trying to update positions at FPS rate
-    std_msgs.msg.Float64MultiArray feedback_msg = new std_msgs.msg.Float64MultiArray();
-    feedback_msg.Data = new double[NUM_AXES];
-    feedback_msg.Data = current_positions;
-    position_pubber.Publish(feedback_msg);
-// // Define the Unix epoch
-// DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-// // DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-// DateTime currentTime = DateTime.UtcNow;
-// double timeSinceEpoch = (currentTime - unixEpoch).TotalSeconds;
-// int sec = (int)currentTime.Second + (int)timeSinceEpoch;
-// uint nanosec = (uint)currentTime.Ticks;//(uint)(((currentTime.Second - (uint)currentTime.Second) * 1e9));
-    sensor_msgs.msg.JointState joint_state_msg = new sensor_msgs.msg.JointState();
-    joint_state_msg.Header = RoverUtils.CreateHeader("ee");
-   
-
-    joint_state_msg.Name = new string[NUM_AXES];
-    joint_state_msg.Position = new double[NUM_AXES];
-    joint_state_msg.Velocity = new double[NUM_AXES];
-    joint_state_msg.Name = moveit_joint_names;
-    joint_state_msg.Position = current_positions;
-    joint_state_msg.Velocity = current_velocities;
-    joint_state_pubber.Publish(joint_state_msg);
-
-    // if(time_elapsed > )
-    //Test code
-        // std_msgs.msg.Float64MultiArray test_msg;
-        // std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
-        // test_msg.Data = new double[6] {1, 1, 1, 1, 1, 1};
-        // MotorCommandCallback(test_msg);
-        // rosNode.SpinSome();
-    }
-
-     private void DriveMotors(std_msgs.msg.Float64MultiArray msg){
-        double[] armCommands = msg.Data;
-       if (armCommands.Length != NUM_AXES)
+    void ApplyVelocity(int i, double degPerSec)
+    {
+        if (i == EE)
         {
-            Debug.LogWarning($"Expected {NUM_AXES} motor commands, but received {armCommands.Length}.");
+            float v = (float)(degPerSec * eeMetersPerDegree);
+            var l = endEffectorLeftJoint.xDrive; l.targetVelocity = -v; endEffectorLeftJoint.xDrive = l;
+            var r = endEffectorRightJoint.xDrive; r.targetVelocity = v; endEffectorRightJoint.xDrive = r;
             return;
         }
+        var d = armJoints[i].xDrive;
+        d.targetVelocity = (float)degPerSec * motor_dirs[i];
+        armJoints[i].xDrive = d;
+    }
 
-        for (int i = 0; i < NUM_AXES; i++)
+    void FixedUpdate()
+    {
+        for (int i = 0; i < NUM_CMD; i++)
         {
-            double command = armCommands[i];
-            var joint = armJoints[i];
-            if (joint != null)
-            {
-                // Set the target velocity of the joint
-                var drive = joint.xDrive;
-                drive.targetVelocity = (float)command * motor_dirs[i];
-                joint.xDrive = drive;
-                print("Meow");
-            }
-            else
-            {
-                Debug.LogError($"Arm joint at index {i} is null");
-            }
+            if (!Has(i)) continue;
+            double v = velCmd[i];
+            if (mode[i] == Mode.Position)
+                v = Math.Max(-posSpeed[i], Math.Min(posSpeed[i], (posTarget[i] - Reading(i)) * positionGain));
+            ApplyVelocity(i, v);
         }
-     }
-     private void controlEndEffector(std_msgs.msg.Float64 msg){
-        double end_effector_cmd = msg.Data;
-        var Ldrive = endEffectorLeftJoint.xDrive;
-        var Rdrive = endEffectorRightJoint.xDrive;
-        Ldrive.targetVelocity = (float)end_effector_cmd * -1;
-        Rdrive.targetVelocity = (float)end_effector_cmd;
-        endEffectorLeftJoint.xDrive = Ldrive;
-        endEffectorRightJoint.xDrive = Rdrive;
-        print("End Effector Controlled");
-     }
+    }
 
-    // Callback for motor commands
+    void SetVelocity(int i, double v) { mode[i] = Mode.Velocity; velCmd[i] = v; }
+
+    void MoveTo(int i, double deg, double speed)
+    {
+        mode[i] = Mode.Position;
+        posTarget[i] = deg;
+        posSpeed[i] = double.IsFinite(speed) && Math.Abs(speed) > 1e-6 ? Math.Abs(speed) : maxSpeedDegPerSec[i];
+    }
+
+    static bool Selected(double[] a, int i) => a != null && i < a.Length && !double.IsNaN(a[i]);
+
+    // ---- /arm/command (rover_msgs/ArmCommand) ----
+
+    public void ArmCommandCallback(rover_msgs.msg.ArmCommand m)
+    {
+        lastArmCommandTime = Time.time;
+        char type = (char)m.cmd_type;
+        if (m.cmd_value == 1 && (type == 'P' || type == 'V' || type == 'S') && !warnedMotorSpace)
+        {
+            warnedMotorSpace = true;
+            Debug.LogWarning("[ArmController] Motor-space command (cmd_value=1): the sim has no differential wrist, treating it as axis space.");
+        }
+
+        switch (type)
+        {
+            case 'V':
+                for (int i = 0; i < NUM_CMD; i++)
+                    if (Selected(m.velocities, i)) SetVelocity(i, m.velocities[i]);
+                break;
+
+            case 'P':
+                for (int i = 0; i < NUM_CMD; i++)
+                    if (Selected(m.positions, i))
+                        MoveTo(i, m.positions[i] * 360.0, Selected(m.velocities, i) ? m.velocities[i] : double.NaN);
+                break;
+
+            case 'S':
+                bool all = m.positions == null || m.positions.Length == 0;
+                for (int i = 0; i < NUM_CMD; i++)
+                    if (all || Selected(m.positions, i)) SetVelocity(i, 0);
+                break;
+
+            case 'Z':
+                for (int i = 0; i < NUM_CMD; i++)
+                {
+                    if (!Selected(m.positions, i) || !Has(i)) continue;
+                    double r = Reading(i);
+                    zeroDeg[i] += r;
+                    if (mode[i] == Mode.Position) posTarget[i] -= r; // keep the same physical target
+                }
+                break;
+
+            case 'H':
+                // No limit switches in the sim: homing drives the selected axes back to the URDF zero.
+                var axes = new List<int>();
+                if (m.cmd_value == 0xAA) for (int i = 0; i < NUM_AXES; i++) axes.Add(i);
+                else if (m.cmd_value == 0xAE) for (int i = 0; i < NUM_CMD; i++) axes.Add(i);
+                else if (m.positions != null) foreach (var p in m.positions) if (!double.IsNaN(p)) axes.Add((int)p);
+                foreach (int i in axes)
+                {
+                    if (i < 0 || i >= NUM_CMD) continue;
+                    zeroDeg[i] = 0;
+                    MoveTo(i, 0, double.NaN);
+                }
+                break;
+
+            case 'G':
+                SetGripper(m.end_effector);
+                break;
+
+            default:
+                if (warnedTypes.Add(m.cmd_type))
+                    Debug.Log($"[ArmController] Ignoring arm command type '{type}' ({m.cmd_type}); not simulated.");
+                break;
+        }
+    }
+
+    // ---- legacy topics from `ros2 run arm_control sim_helper` ----
+
+    bool ArmCommandActive => Time.time - lastArmCommandTime < 2f;
+
     public void MotorCommandCallback(std_msgs.msg.Float64MultiArray msg)
     {
-          //Using a lock as ROS subscribers are on a seperate  thread
-lock (queueLock){
-  print("MeowCallbackLocked");
-          motorCommandQueue.Enqueue(msg);
-}
-
- 
-    }
-    public void endEffectorCallback(std_msgs.msg.Float64 msg){
-        lock(endEffectorQueueLock){
-            endEffectorQueue.Enqueue(msg);
+        if (ArmCommandActive) return; // we already got the same command on /arm/command
+        double[] cmd = msg.data;
+        if (cmd == null || cmd.Length < NUM_AXES)
+        {
+            Debug.LogWarning($"[ArmController] Expected {NUM_AXES} (or {NUM_AXES + 1} with gripper) values, got {cmd?.Length ?? 0}.");
+            return;
         }
+        for (int i = 0; i < NUM_AXES; i++)
+            if (!double.IsNaN(cmd[i])) SetVelocity(i, cmd[i]);
+        if (cmd.Length > NUM_AXES) SetGripper(cmd[NUM_AXES]);
     }
 
+    public void endEffectorCallback(std_msgs.msg.Float64 msg)
+    {
+        if (!ArmCommandActive) SetGripper(msg.data);
+    }
+
+    /// <summary>Legacy gripper command: finger velocity in m/s (positive closes).</summary>
+    void SetGripper(double cmd)
+    {
+        if (double.IsNaN(cmd)) return;
+        SetVelocity(EE, cmd / eeMetersPerDegree);
+    }
+
+    // ---- feedback ----
+
+    void Update()
+    {
+        feedbackTimer += Time.deltaTime;
+        if (feedbackTimer < 1f / feedbackRateHz) return;
+        feedbackTimer = 0;
+
+        var positions = new double[NUM_AXES];
+        var velocities = new double[NUM_AXES];
+        for (int i = 0; i < NUM_AXES; i++)
+        {
+            var j = armJoints[i];
+            if (j == null || j.jointPosition.dofCount == 0) continue;
+            positions[i] = j.jointPosition[0] * motor_dirs[i];
+            velocities[i] = j.jointVelocity[0] * motor_dirs[i];
+        }
+
+        positionPub.Publish(new std_msgs.msg.Float64MultiArray { data = positions });
+        jointStatePub.Publish(new sensor_msgs.msg.JointState
+        {
+            header = RosTime.Header(""),
+            name = moveit_joint_names,
+            position = positions,
+            velocity = velocities,
+        });
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//* Graveyard/Archive - Code that wasn't used
-
-
-
-    // Callback for cmd_vel messages
-//     public void CmdVelCallback(geometry_msgs.msg.Twist msg)
-//     {
- 
-//         double linear = msg.Linear.X;       // Forwards/Backwards velocity. Turns into 
-//         double angular = msg.Angular.Z;
-
-
-//         //RIGHT is the inverse motor control of regular b/c motors dk what side they're on
-//         // counterclockwise = positive velocity
-//         // double right = linear*-1 + angular;
-//         // double left = linear - angular;
-//         double right = angular;
-//         double left = angular;
-//    // std_msgs.msg.Float64MultiArray test_msg;
-//         std_msgs.msg.Float64MultiArray test_msg = new std_msgs.msg.Float64MultiArray();
-
-//         //this is correct distribution of motor commands following wheel_joint_names
-//         //TODO: could change this to be more dynamic in the future
-//         test_msg.Data = new double[6] {left, right, left, left, right, right};
-        
-//         MotorCommandCallback(test_msg);
-//         Debug.Log($"Received cmd_vel - Linear: {linear}, Angular: {angular}");
-//         // // TODO: Implement robot movement based on cmd_vel
-//         // // For example, convert linear and angular velocities to wheel velocities
-//         // and set the wheel joints' target velocities accordingly
-//     }
