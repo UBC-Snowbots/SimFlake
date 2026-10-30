@@ -23,6 +23,8 @@ namespace SimFlake.Ros
         {
             if (Running) return;
             string script =
+                // No job control: keeps rosbridge in this session/process group so Stop() always reaches it.
+                "set +m; " +
                 "command -v ros2 >/dev/null 2>&1 || source /opt/ros/${ROS_DISTRO:-jazzy}/setup.bash; " +
                 "if ! ros2 pkg prefix rosbridge_server >/dev/null 2>&1; then " +
                 "  echo 'ERROR: rosbridge_server not found. Run SimFlake/setup.sh (or: sudo apt install ros-jazzy-rosbridge-suite)'; exit 3; fi; " +
@@ -86,13 +88,17 @@ namespace SimFlake.Ros
         public static void Stop()
         {
             if (!Running) { proc = null; return; }
-            int pid = proc.Id;
+            int sid = proc.Id; // setsid made the launch shell a session leader, so its pid is the session id
             try
             {
-                // SIGINT to the whole group (like Ctrl+C), then SIGKILL if it hangs.
-                Process.Start("/bin/kill", $"-INT -- -{pid}")?.WaitForExit(1000);
-                if (!proc.WaitForExit(3000))
-                    Process.Start("/bin/kill", $"-KILL -- -{pid}")?.WaitForExit(1000);
+                // SIGINT to everything in the session (like Ctrl+C), then SIGKILL whatever is left.
+                // Session rather than process group: an interactive bash may move jobs into their own group.
+                // Always finish with SIGKILL: if Play is stopped while ~/.bashrc is still loading, SIGINT
+                // can interrupt it halfway and the shell would otherwise go on to start rosbridge with a
+                // half-loaded environment (e.g. no ROS_DOMAIN_ID).
+                Process.Start("/usr/bin/pkill", $"-INT -s {sid}")?.WaitForExit(1000);
+                proc.WaitForExit(3000);
+                Process.Start("/usr/bin/pkill", $"-KILL -s {sid}")?.WaitForExit(1000);
             }
             catch (Exception e) { Debug.LogWarning("[ROS] stopping rosbridge: " + e.Message); }
             proc = null;
