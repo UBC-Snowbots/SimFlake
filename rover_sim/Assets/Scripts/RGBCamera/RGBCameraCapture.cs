@@ -1,145 +1,87 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.Buffers;
+using SimFlake.Ros;
 using UnityEngine;
-using System.IO;
-using System.Threading.Tasks;
-using ROS2;
-using System.Runtime.CompilerServices;
-using sensor_msgs.msg;
-using std_msgs.msg;
 using UnityEngine.Rendering;
 
+/// <summary>
+/// Raw RGB camera: publishes sensor_msgs/Image (rgb8) and sensor_msgs/CameraInfo.
+///
+/// Raw images are big (width*height*3 bytes per frame). Through rosbridge, 640x480 @ 30 Hz is fine;
+/// 1280x720 tops out around 15 Hz. For high resolutions use CompressedCameraCapture instead.
+/// </summary>
 public class RGBCameraCapture : MonoBehaviour
 {
-    public Camera rgbCamera; // The RGB camera
-    public int width = 1920; // Width of the image
-    public int height = 1080; // Height of the image
-    public int fps = 30; // Frames per second
+    public Camera rgbCamera;
+    public int width = 640;
+    public int height = 480;
+    public int fps = 30;
+    public string frameid = "camera_link";
 
-    public string frameid = "cam_unused";
-    private RenderTexture renderTexture;
-    private Texture2D texture2D;
+    public string imageTopic = "/camera/image_raw";
+    public string cameraInfoTopic = "/camera/camera_info";
+    [Tooltip("Stop the camera drawing to the screen; it is still rendered off-screen for ROS.")]
+    public bool hideFromScreen = true;
 
-
-    // ROS2 Node and Publisher
-    //private ROS2UnityComponent ros2Unity;
-    private ROS2Node rosNode;
-    private IPublisher<sensor_msgs.msg.Image> imagePublisher;
-
-    ROS2UnityCore ros2Unity = new ROS2UnityCore();
-
-    
+    RosPublisher<sensor_msgs.msg.Image> imagePub;
+    RosPublisher<sensor_msgs.msg.CameraInfo> infoPub;
+    float timer;
+    [Tooltip("Frames that may be in the readback/encode/send pipeline at once.")]
+    public int maxInFlight = 2;
+    int inFlight;
 
     void Start()
     {
-        // Initialize the RenderTexture and Texture2D
-        renderTexture = new RenderTexture(width, height, 24);
-        texture2D = new Texture2D(width, height, TextureFormat.RGB24, false);
+        if (rgbCamera == null) rgbCamera = GetComponent<Camera>();
+        if (rgbCamera == null) { Debug.LogError($"[{name}] RGBCameraCapture has no camera"); enabled = false; return; }
+        if (hideFromScreen) rgbCamera.enabled = false;
+        if ((long)width * height * 3 * fps > 30_000_000)
+            Debug.LogWarning($"[{name}] Raw camera {width}x{height}@{fps} is ~{width * height * 3L * fps / 1_000_000} MB/s; rosbridge will drop frames. Lower the resolution/fps or use CompressedCameraCapture.");
 
-        // Set the camera's target texture to the RenderTexture
-        rgbCamera.targetTexture = renderTexture;
-
-
-            // Initialize ROS2
-        if (ros2Unity.Ok())
-        {
-            rosNode = ros2Unity.CreateNode("unity_image_capture");
-            // Subscribe to motor commands topic
-            
-            imagePublisher = rosNode.CreatePublisher<sensor_msgs.msg.Image>("/camera/image_raw");
-
-        }
-        else
-        {
-            Debug.LogError("ROS2UnityCore is not OK");
-        }
-
-
-        StartCoroutine(CaptureAndPublishImages());
+        // Dedicated socket: big frames never delay small messages like /cmd_vel feedback or IMU.
+        imagePub = Ros.Advertise<sensor_msgs.msg.Image>(imageTopic, 1, dedicatedSocket: true);
+        infoPub = Ros.Advertise<sensor_msgs.msg.CameraInfo>(cameraInfoTopic, 2);
     }
 
-
-
-
-
-    //TODO: Huge issue, encoding six million uncompressed bytes per second is insane
-    // don't know how to compress images... need to figure out... still technically works
-    // 
-    IEnumerator CaptureAndPublishImages()
+    void Update()
     {
-        float interval = 1.0f / fps;
-        float nextExecutionTime = Time.time;
+        timer += Time.deltaTime;
+        if (timer < 1f / fps) return;
+        timer = 0;
+        if (System.Threading.Volatile.Read(ref inFlight) >= maxInFlight || !Ros.Connected) return; // previous frame still being sent, or nobody to send to
 
-    while (true)
+        var rt = SensorCamera.Render(rgbCamera, width, height);
+        var header = RosTime.Header(frameid);
+        System.Threading.Interlocked.Increment(ref inFlight);
+        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGB24, req => OnReadback(req, header));
+    }
+
+    void OnReadback(AsyncGPUReadbackRequest req, std_msgs.msg.Header header)
     {
-        // Ensure the next execution happens at the fixed interval
-        nextExecutionTime += interval;
+        if (req.hasError || this == null) { System.Threading.Interlocked.Decrement(ref inFlight); return; }
+        byte[] pixels = SensorCamera.CopyRows(req.GetData<byte>(), width, height, 3, topDown: true);
+        int w = width, h = height;
+        infoPub.Publish(SensorCamera.Info(rgbCamera, w, h, header));
 
-        // Capture the image
-        CaptureImage();
-
-        // Calculate the time to wait until the next execution
-        float sleepTime = nextExecutionTime - Time.time;
-        if (sleepTime > 0)
+        SensorCamera.Background(() =>
         {
-            yield return new WaitForSeconds(sleepTime);
-        }
-        else
-        {
-            // If we're behind schedule, skip waiting to catch up
-            Debug.LogWarning("Frame skipped to maintain timing!");
-        }
+            try
+            {
+                imagePub.Publish(new sensor_msgs.msg.Image
+                {
+                    header = header,
+                    width = (uint)w,
+                    height = (uint)h,
+                    encoding = "rgb8",
+                    step = (uint)(w * 3),
+                    data = pixels,
+                    dataLength = w * h * 3,
+                });
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(pixels);
+                System.Threading.Interlocked.Decrement(ref inFlight);
+            }
+        });
     }
-    }
-
-   //encodes rendered view into byte[] to send thru ROS network
-    void CaptureImage()
-    {
-        // Render the camera's view to the RenderTexture
-        rgbCamera.Render();
-
-        // Read the rendered bytes to CPU, async read to avoid stalling the CPU and blowing up framerate
-        AsyncGPUReadback.Request(renderTexture, 0, TextureFormat.RGB24, OnCompleteReadback); 
-    }
-
-    //call back function when bytes are read async
-    void OnCompleteReadback(AsyncGPUReadbackRequest request)
-    {
-        if (request.hasError)
-        {
-            Debug.LogWarning("GPU readback error detected!");
-            return;
-        }
-
-        // Get the data from GPU memory (non-blocking)
-        var rawData = request.GetData<byte>();
-
-        byte[] imageBytes = rawData.ToArray();
-
-        // Publish to ROS 2
-        PublishImage(imageBytes);
-    }
-
-    //publishing single image to ROS..
-    private void PublishImage(byte[] imageBytes)
-    {
-
-        // Create the ROS 2 Image message
-        var imageMessage = new Image
-        {
-            Header  = RoverUtils.CreateHeader(frameid),
-            Height = (uint)height,      //requires unsigned... doesn't matter for our usecase, can explicit cast
-            Width = (uint)width,        //ditto 
-            Encoding = "rgb8",            // Image encoding 
-            Step = (uint)width * 3,             // 3 bytes per pixel for RGB encoding
-            Data = imageBytes             // The image data as byte array
-        };
-
-        // Publish the image message to ROS 2
-        imagePublisher.Publish(imageMessage);
-
-      //  Debug.Log("Image message published to ROS 2 topic!");
-    }
-
-
 }

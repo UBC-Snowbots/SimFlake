@@ -1,118 +1,70 @@
-using System.Collections;
-using System.Collections.Generic;
+using System.Buffers;
+using SimFlake.Ros;
 using UnityEngine;
-using System.IO;
-using System.Threading.Tasks;
-using ROS2;
-using sensor_msgs.msg;
-using std_msgs.msg;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
+/// <summary>
+/// JPEG camera: publishes sensor_msgs/CompressedImage. JPEG encoding runs on a worker thread,
+/// so high resolutions (1080p @ 30) are fine for the sim's frame rate.
+/// </summary>
 public class CompressedCameraCapture : MonoBehaviour
 {
-    public Camera rgbCamera; // The RGB camera
-    public int width = 1920; // Width of the image
-    public int height = 1080; // Height of the image
-    public int fps = 30; // Frames per second
+    public Camera rgbCamera;
+    public int width = 1280;
+    public int height = 720;
+    public int fps = 30;
+    [Range(1, 100)] public int jpegQuality = 75;
+    public string frameid = "camera_link";
+    public string topic = "/camera/image/compressed";
+    [Tooltip("Stop the camera drawing to the screen; it is still rendered off-screen for ROS.")]
+    public bool hideFromScreen = true;
 
-    private RenderTexture renderTexture;
-    private Texture2D texture2D;
-
-    // ROS2 Node and Publisher
-    private ROS2Node rosNode;
-    private IPublisher<CompressedImage> compressedImagePublisher;
-
-    ROS2UnityCore ros2Unity = new ROS2UnityCore();
+    RosPublisher<sensor_msgs.msg.CompressedImage> pub;
+    float timer;
+    [Tooltip("Frames that may be in the readback/encode/send pipeline at once.")]
+    public int maxInFlight = 2;
+    int inFlight;
 
     void Start()
     {
-        // Initialize the RenderTexture and Texture2D
-        renderTexture = new RenderTexture(width, height, 24);
-        texture2D = new Texture2D(width, height, TextureFormat.RGB24, false);
-
-        // Set the camera's target texture to the RenderTexture
-        rgbCamera.targetTexture = renderTexture;
-
-        // Initialize ROS2
-        if (ros2Unity.Ok())
-        {
-            rosNode = ros2Unity.CreateNode("unity_compressed_image_capture");
-            compressedImagePublisher = rosNode.CreatePublisher<CompressedImage>("/camera/image/compressed");
-        }
-        else
-        {
-            Debug.LogError("ROS2UnityCore is not OK");
-        }
-
-        StartCoroutine(CaptureAndPublishImages());
+        if (rgbCamera == null) rgbCamera = GetComponent<Camera>();
+        if (rgbCamera == null) { Debug.LogError($"[{name}] CompressedCameraCapture has no camera"); enabled = false; return; }
+        if (hideFromScreen) rgbCamera.enabled = false;
+        pub = Ros.Advertise<sensor_msgs.msg.CompressedImage>(topic, 1, dedicatedSocket: true);
     }
 
-    IEnumerator CaptureAndPublishImages()
+    void Update()
     {
-   float interval = 1.0f / fps;
-        float nextExecutionTime = Time.time;
+        timer += Time.deltaTime;
+        if (timer < 1f / fps) return;
+        timer = 0;
+        if (System.Threading.Volatile.Read(ref inFlight) >= maxInFlight || !Ros.Connected) return;
 
-    while (true)
-    {
-        // Ensure the next execution happens at the fixed interval
-        nextExecutionTime += interval;
-
-
-        CaptureAndPublishCompressedImage();
-
-        // Calculate the time to wait until the next execution
-        float sleepTime = nextExecutionTime - Time.time;
-        if (sleepTime > 0)
-        {
-            yield return new WaitForSeconds(sleepTime);
-        }
-        else
-        {
-            // If we're behind schedule, skip waiting to catch up
-            Debug.LogWarning("Frame skipped to maintain timing! This means i couldn't keep up with the FPS");
-        }
-    }
+        var rt = SensorCamera.Render(rgbCamera, width, height);
+        var header = RosTime.Header(frameid);
+        System.Threading.Interlocked.Increment(ref inFlight);
+        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGB24, req => OnReadback(req, header));
     }
 
-    async void CaptureAndPublishCompressedImage()
+    void OnReadback(AsyncGPUReadbackRequest req, std_msgs.msg.Header header)
     {
-        // Render the camera's view to the RenderTexture
-        rgbCamera.Render();
+        if (req.hasError || this == null) { System.Threading.Interlocked.Decrement(ref inFlight); return; }
+        byte[] pixels = SensorCamera.CopyRows(req.GetData<byte>(), width, height, 3, topDown: false);
+        int w = width, h = height, q = jpegQuality;
 
-        // Read the RenderTexture into the Texture2D
-        RenderTexture.active = renderTexture;
-        texture2D.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-        texture2D.Apply();
-        RenderTexture.active = null;
-
-        // Compress the image to JPEG
-        // byte[] compressedImageBytes = texture2D.EncodeToJPG(50); // Quality: 75 (adjustable)
-                // Capture the image
-        // Task<byte[]> compressTask = Task.Run(() =>
-        // {
-            Debug.LogWarning("Frame skipped to maintain timing! This means i couldn't keep up with the FPS");
-        byte[] compressedImageBytes = texture2D.EncodeToJPG(50);
-        // return compressedImageBytes;
-
-        // });
-        // Create the ROS2 CompressedImage message
-        // byte[] compressedImageBytes = await compressTask;
-        var compressedImageMessage = new CompressedImage
+        SensorCamera.Background(() =>
         {
-            Header = new std_msgs.msg.Header
+            try
             {
-                Frame_id = "camera_frame",
-                Stamp = new builtin_interfaces.msg.Time
-                {
-                    Sec = (int)(Time.timeSinceLevelLoad),
-                    Nanosec = (uint)((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
-                }
-            },
-            Format = "jpeg",
-
-            Data = compressedImageBytes
-        };
-
-        // Publish the compressed image message
-        compressedImagePublisher.Publish(compressedImageMessage);
+                byte[] jpg = ImageConversion.EncodeArrayToJPG(pixels, GraphicsFormat.R8G8B8_SRGB, (uint)w, (uint)h, (uint)(w * 3), q);
+                pub.Publish(new sensor_msgs.msg.CompressedImage { header = header, format = "jpeg", data = jpg });
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(pixels);
+                System.Threading.Interlocked.Decrement(ref inFlight);
+            }
+        });
     }
 }

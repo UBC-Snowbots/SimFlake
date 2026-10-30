@@ -1,197 +1,149 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using TMPro;
 using System;
+using SimFlake.Ros;
+using TMPro;
+using UnityEngine;
 
-//ROS2 stuff
-using ROS2;
-using sensor_msgs.msg;
-
+/// <summary>
+/// Simulated GNSS receiver. Publishes sensor_msgs/NavSatFix on /gps/fix.
+///
+/// The Unity world is treated as a flat local tangent plane centred on (startLatitude, startLongitude)
+/// at the tracked object's start position: Unity +z = north, +x = east, +y = up.
+/// 1 Unity unit = 1 metre.
+/// </summary>
 public class LocationStuff : MonoBehaviour
 {
-    [SerializeField]
-    private char unit = 'K';
+    [SerializeField] private char unit = 'K';
 
     public TMP_Text debugTxt;
     public bool gps_ok = false;
-    float PI = Mathf.PI;
 
-    GPSLoc startLoc = new GPSLoc();
-    GPSLoc currLoc = new GPSLoc();
-
-    bool measureDistance = false;
-
-    Vector3 startPosition;  // Store the rover's initial position in world space
+    [Tooltip("The object whose position is reported (the rover's base link). Defaults to this object.")]
     public Transform object_to_track;
 
-    [Header("ROS2 Publishing")]
+    [Header("Origin (lat/lon at the rover's start position)")]
+    public double startLatitude = 49.0;
+    public double startLongitude = -123.0;
+    public double startAltitude = 100.0;
+
+    [Header("ROS")]
+    public string topic = "/gps/fix";
+    public string frameId = "gnss";
     [Tooltip("Publish rate in Hz")]
     [SerializeField] private float publishRateHz = 5f;
-    ROS2UnityCore ros2Unity = new ROS2UnityCore();
-    private float publishTimer = 0f;
-    private ROS2Node rosNode;
-    private IPublisher<NavSatFix> gpsPublisher;
-    private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    // Start is called before the first frame update
-    IEnumerator Start()
-    {
-        // Simulate starting position as 0, 0 in local GPS coordinates
-        startLoc = new GPSLoc(-123f, 49f);
-        startPosition = transform.position;//object_to_track.position;
+    [Tooltip("Seconds before the first fix (simulates GNSS start-up).")]
+    public float startupDelay = 2f;
 
-        debugTxt.text = "Initializing GPS...";
-        yield return new WaitForSeconds(2);  // Simulate a brief delay for GPS startup
-        gps_ok = true;
-        debugTxt.text = "GPS initialized. Starting at (0, 0).";
-       // Initialize ROS2
-        if (ros2Unity.Ok())
-        {
-            rosNode = ros2Unity.CreateNode("gps_sensor_node");
-            gpsPublisher = rosNode.CreatePublisher<NavSatFix>("/gps/fix");
-        }
-        else
-        {
-            Debug.LogError("ROS2UnityCore is not OK");
-        }
+    [Header("Noise (metres, 1 sigma). 0 = perfect GPS")]
+    public float horizontalNoise = 0f;
+    public float verticalNoise = 0f;
+
+    const double EarthRadius = 6378137.0; // WGS-84 equatorial radius
+
+    RosPublisher<sensor_msgs.msg.NavSatFix> pub;
+    Vector3 startPosition;
+    double lat, lon, alt;
+    double storedLat, storedLon;
+    bool measureDistance;
+    float timer;
+    System.Random rng = new System.Random();
+
+    void Start()
+    {
+        if (object_to_track == null) object_to_track = transform;
+        startPosition = object_to_track.position;
+        pub = Ros.Advertise<sensor_msgs.msg.NavSatFix>(topic, 2);
+        SetText("Initializing GPS...");
+        Invoke(nameof(StartGps), startupDelay);
     }
 
-    // Update is called once per frame
+    void StartGps()
+    {
+        gps_ok = true;
+        SetText("GPS initialized.");
+    }
+
     void Update()
     {
-        if (gps_ok)
+        if (!gps_ok) return;
+
+        Vector3 d = object_to_track.position - startPosition;
+        double east = d.x + Gaussian() * horizontalNoise;
+        double north = d.z + Gaussian() * horizontalNoise;
+        double up = d.y + Gaussian() * verticalNoise;
+        lat = startLatitude + Rad2Deg(north / EarthRadius);
+        lon = startLongitude + Rad2Deg(east / (EarthRadius * Math.Cos(Deg2Rad(startLatitude))));
+        alt = startAltitude + up;
+
+        if (debugTxt != null)
         {
-            // Calculate new local GPS coordinates relative to starting position
-            currLoc.lat = startLoc.lat + (object_to_track.position.x - startPosition.x) * 0.0001f;  // Scale factor for lat
-            currLoc.lon = startLoc.lon + (object_to_track.position.z - startPosition.z) * 0.0001f;  // Scale factor for lon
-
-            debugTxt.text = "Current Location: \nLat: " + currLoc.lat.ToString("F6") 
-                          + "\nLon: " + currLoc.lon.ToString("F6");
-
+            string text = $"Current Location:\nLat: {lat:F7}\nLon: {lon:F7}";
             if (measureDistance)
-            {
-                double distanceBetween = distance(currLoc.lat, currLoc.lon, startLoc.lat, startLoc.lon, 'K');
-                debugTxt.text += "\nDistance from start: " + distanceBetween.ToString("F2") + " km";
-            }
-                publishTimer += Time.deltaTime;
-            if (publishTimer >= (1f / publishRateHz))
-            {
-                publishTimer = 0f;
-                PublishGPS();
-            }
+                text += $"\nDistance from start: {distance(lat, lon, storedLat, storedLon, unit):F3} km";
+            debugTxt.text = text;
         }
-  
+
+        timer += Time.deltaTime;
+        if (timer >= 1f / publishRateHz)
+        {
+            timer = 0;
+            PublishGPS();
+        }
     }
-    private void PublishGPS()
+
+    void PublishGPS()
     {
-        if (gpsPublisher == null)
-            return;
-
-        // Create a new NavSatFix message
-        NavSatFix msg = new NavSatFix();
-
-        // // 1. Fill the header with a ROS timestamp
-        // double secs = (DateTime.UtcNow - epoch).TotalSeconds; //? Little odd, but unity sets start point as Jan 01, 0001 (start of time). All other computers think time started at Jan 1, 1970, so we subtract the amount of seconds from 0001 to 1970.
-        // // uint secsInt = (uint)secs;
-        // uint nsecs = (uint)((secs - secsInt) * 1e9);
-
-        // msg.Header = new std_msgs.msg.Header
-        //     {
-        //         Frame_id = "camera_frame",
-        //         Stamp = new builtin_interfaces.msg.Time
-        //         {
-        //             Sec = (int)(secs),//(Time.timeSinceLevelLoad),
-        //             Nanosec = (uint)(nsecs)//((Time.timeSinceLevelLoad - Mathf.Floor(Time.timeSinceLevelLoad)) * 1e9f)
-        //         }
-        //     };
-        msg.Header = RoverUtils.CreateHeader("gnss"); //! FRAME ID
-
-        // 2. Fill latitude/longitude (and altitude if available)
-        msg.Latitude = currLoc.lat;   // NavSatFix expects double
-        msg.Longitude = currLoc.lon;  // so cast if needed
-        msg.Altitude = 100.0;
-
-        // 3. Publish
-        gpsPublisher.Publish(msg);
+        var msg = new sensor_msgs.msg.NavSatFix
+        {
+            header = RosTime.Header(frameId),
+            latitude = lat,
+            longitude = lon,
+            altitude = alt,
+            position_covariance_type = sensor_msgs.msg.NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN,
+        };
+        msg.status.status = sensor_msgs.msg.NavSatStatus.STATUS_FIX;
+        double h2 = Math.Max(horizontalNoise * horizontalNoise, 1e-4);
+        double v2 = Math.Max(verticalNoise * verticalNoise, 1e-4);
+        msg.position_covariance[0] = h2;
+        msg.position_covariance[4] = h2;
+        msg.position_covariance[8] = v2;
+        pub.Publish(msg);
     }
+
     public void StopGPS()
     {
         gps_ok = false;
-        debugTxt.text = "GPS stopped.";
-
+        SetText("GPS stopped.");
     }
 
     public void StoreCurrentGPS()
     {
-        startLoc = new GPSLoc(currLoc.lon, currLoc.lat);
+        storedLat = lat;
+        storedLon = lon;
         measureDistance = true;
-        debugTxt.text += "\nStored current location as new starting point.";
     }
 
-    //https://www.geodatasource.com/resources/tutorials/how-to-calculate-the-distance-between-2-locations-using-c/
+    void SetText(string s) { if (debugTxt != null) debugTxt.text = s; }
+
+    double Gaussian()
+    {
+        // Box-Muller
+        double u1 = 1.0 - rng.NextDouble(), u2 = rng.NextDouble();
+        return Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+    }
+
+    // Great-circle distance. unit: 'K' km, 'N' nautical miles, otherwise statute miles.
     private double distance(double lat1, double lon1, double lat2, double lon2, char unit)
     {
-        if ((lat1 == lat2) && (lon1 == lon2))
-        {
-            return 0;
-        }
-        else
-        {
-            double theta = lon1 - lon2;
-            double dist = Math.Sin(deg2rad(lat1)) * Math.Sin(deg2rad(lat2)) 
-                        + Math.Cos(deg2rad(lat1)) * Math.Cos(deg2rad(lat2)) * Math.Cos(deg2rad(theta));
-            dist = Math.Acos(dist);
-            dist = rad2deg(dist);
-            dist = dist * 60 * 1.1515;
-            if (unit == 'K')
-            {
-                dist = dist * 1.609344;
-            }
-            else if (unit == 'N')
-            {
-                dist = dist * 0.8684;
-            }
-            return (dist);
-        }
+        if (lat1 == lat2 && lon1 == lon2) return 0;
+        double theta = lon1 - lon2;
+        double dist = Math.Sin(Deg2Rad(lat1)) * Math.Sin(Deg2Rad(lat2))
+                    + Math.Cos(Deg2Rad(lat1)) * Math.Cos(Deg2Rad(lat2)) * Math.Cos(Deg2Rad(theta));
+        dist = Rad2Deg(Math.Acos(Math.Min(1.0, dist))) * 60 * 1.1515;
+        if (unit == 'K') dist *= 1.609344;
+        else if (unit == 'N') dist *= 0.8684;
+        return dist;
     }
 
-    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //::  This function converts decimal degrees to radians             :::
-    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    private double deg2rad(double deg)
-    {
-        return (deg * Math.PI / 180.0);
-    }
-
-    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //::  This function converts radians to decimal degrees             :::
-    //:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    private double rad2deg(double rad)
-    {
-        return (rad / Math.PI * 180.0);
-    }
-
-}
-
-
-public class GPSLoc
-{
-    public float lon;
-    public float lat;
-
-    public GPSLoc()
-    {
-        lon = 0;
-        lat = 0;
-    }
-    public GPSLoc(float lon, float lat)
-    {
-        this.lon = lon;
-        this.lat = lat;
-    }
-
-    public string getLocData()
-    {
-        return "Lat: " + lat + " \nLon: " + lon;
-    }
+    static double Deg2Rad(double deg) => deg * Math.PI / 180.0;
+    static double Rad2Deg(double rad) => rad / Math.PI * 180.0;
 }
