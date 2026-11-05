@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: DesertMesas
+  m_Shader: {fileID: 4800000, guid: 4f9563bb181139433bed98d4bec14d67, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _CloudCover: 0.22
+    - _CloudScale: 0.9
+    - _CloudSpeed: 0.004
+    - _Exposure: 1
+    - _MountainHeight: 5
+    - _Seed: 11.3
+    - _SnowLine: 1.2
+    - _SunGlow: 0.6
+    - _SunSize: 0.0004
+    m_Colors:
+    - _AlpenGlow: {r: 0.85, g: 0.62, b: 0.5, a: 1}
+    - _CloudLit: {r: 0.98, g: 0.97, b: 0.95, a: 1}
+    - _CloudShadow: {r: 0.66, g: 0.68, b: 0.76, a: 1}
+    - _FarMountainColor: {r: 0.66, g: 0.58, b: 0.58, a: 1}
+    - _GroundColor: {r: 0.45, g: 0.36, b: 0.28, a: 1}
+    - _HorizonColor: {r: 0.8, g: 0.79, b: 0.75, a: 1}
+    - _NearMountainColor: {r: 0.52, g: 0.38, b: 0.31, a: 1}
+    - _SunColor: {r: 1, g: 0.95, b: 0.86, a: 1}
+    - _ZenithColor: {r: 0.16, g: 0.36, b: 0.68, a: 1}
+  m_BuildTextureStacks: []
