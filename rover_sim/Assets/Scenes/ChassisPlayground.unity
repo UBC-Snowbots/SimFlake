@@ -32,11 +32,11 @@ RenderSettings:
   m_FlareFadeSpeed: 3
   m_HaloTexture: {fileID: 0}
   m_SpotCookie: {fileID: 10001, guid: 0000000000000000e000000000000000, type: 0}
-  m_DefaultReflectionMode: 1
+  m_DefaultReflectionMode: 0
   m_DefaultReflectionResolution: 128
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 0.6
-  m_CustomReflection: {fileID: 8900000, guid: 7f0176421b2691ebc908037c4509b65c, type: 2}
+  m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 2045891626}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
@@ -15407,6 +15407,55 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1555014527
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1555014529}
+  - component: {fileID: 1555014528}
+  m_Layer: 0
+  m_Name: Sky Environment
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1555014528
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555014527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e753ae5df62c1e29a197884429637e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  timeOfDay: 2
+  weather: 0
+  skyMaterial: {fileID: 2100000, guid: d53a6f3c8338742d1926a8a418b3aced, type: 2}
+  sun: {fileID: 2045891626}
+  baseFogDensity: 0.0032
+--- !u!4 &1555014529
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1555014527}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1555967036 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 490835333512835692, guid: 1197e32cbfbc7b412b25e9c1286e061d, type: 3}
@@ -20148,3 +20197,4 @@ SceneRoots:
   - {fileID: 1769978163}
   - {fileID: 830001742}
   - {fileID: 1222837636}
+  - {fileID: 1555014529}

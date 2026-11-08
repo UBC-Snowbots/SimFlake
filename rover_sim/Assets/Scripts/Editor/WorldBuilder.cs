@@ -11,7 +11,7 @@ namespace SimFlake.EditorTools
     /// Generates the test features in ChassisPlayground: a sandy rock pit, a drop course (0.3/0.6/1.0 m)
     /// and a slope course (10/20/30 deg). Everything goes under one root object "Generated Features",
     /// which is deleted and rebuilt on every run, so tweak the numbers here and re-run.
-    ///   Menu: SimFlake > Build Playground Features
+    ///   Menu: SimFlake > World Generation > Build Playground Features
     ///   Headless: Unity -batchmode -projectPath rover_sim -executeMethod SimFlake.EditorTools.WorldBuilder.BuildFromCommandLine
     /// Add -screenshots <dir> (without -nographics) to also render preview PNGs.
     /// </summary>
@@ -30,7 +30,7 @@ namespace SimFlake.EditorTools
         static Terrain terrain;
         static PhysicMaterial groundPhysics;
 
-        [MenuItem("SimFlake/Build Playground Features")]
+        [MenuItem("SimFlake/World Generation/Build Playground Features", priority = 100)]
         public static void BuildMenu()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;

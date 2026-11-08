@@ -17,7 +17,7 @@ namespace SimFlake.EditorTools
     /// Everything comes from the analytic height function H(x, z) and the layout constants below. Change them and
     /// re-run: the "Generated World" root and Assets/Worlds/Badlands are deleted and rebuilt. Anything else you add to
     /// the scene (robots etc.) is kept.
-    ///   Menu: SimFlake > Build Badlands Traversal World
+    ///   Menu: SimFlake > World Generation > Build Badlands Traversal World
     ///   Headless: Unity -batchmode -projectPath rover_sim -executeMethod SimFlake.EditorTools.BadlandsBuilder.BuildFromCommandLine [-screenshots dir]
     /// </summary>
     public static class BadlandsBuilder
@@ -26,9 +26,14 @@ namespace SimFlake.EditorTools
         const string AssetDir = "Assets/Worlds/Badlands";
         const string TexDir = "Assets/Worlds/BadlandsTextures"; // tinted albedos from tools/make_badlands_textures.py
         const string RootName = "Generated World";
+        const string ArucoPrefabPath = "Assets/Scripts/ArucoMarker/ArucoMarker_75cm.prefab";
 
         const float TileSize = 500f, BaseY = -20f, HeightRange = 150f;
-        const int CenterRes = 1025, OuterRes = 513, CenterSplat = 1024, OuterSplat = 256, CenterDetail = 512;
+        // Cliff faces run right to the edge of the 1.5 km map (the cliffs keep going up the boundary mountains).
+        const float MapEdge = 1.5f * TileSize - 2f;
+        // All tiles share one heightmap resolution: Unity only stitches neighbouring tiles cleanly when they match,
+        // otherwise cracks open along the seams at x/z = +-250.
+        const int CenterRes = 1025, OuterRes = 1025, CenterSplat = 1024, OuterSplat = 256, CenterDetail = 512;
 
         // ------------------------------------------------------------------ layout (world metres, +x east, +z north)
 
@@ -38,6 +43,20 @@ namespace SimFlake.EditorTools
 
         // Escarpment: a ~12 m cliff band across the middle of the tile with three ways up.
         const float WestRampX = -165f, EastTalusX = 150f, SlotX = 15f, SlotHalf = 3.3f, SlotLen = 40f;
+        // Horizontal width of the slot's side step. Wide enough for the 0.49 m heightmap grid to draw it without stair-steps.
+        const float SlotSoft = 1.2f;
+        // Lane through the slot kept clear of rocks bigger than pebbles (the rock faces leave ~3.8 m).
+        const float SlotLane = 2.4f;
+        // Ramps: breaches in the escarpment. Each is a notch cut into the plateau (rock walls on both sides, side step
+        // RampCutSoft wide) with an earth/debris fan below it (side slopes RampFillSoft wide). w = horizontal length.
+        static readonly (float x, float half, float w, bool rough)[] Ramps =
+        {
+            (WestRampX, 14f, 50f, false), // west: long, even ramp (~15 deg)
+            (EastTalusX, 22f, 34f, true), // east: steeper rockfall slope (~22 deg) + bumps
+        };
+        const float CliffW = 1.6f, RampCutSoft = 1.2f, RampFillSoft = 10f;
+        // the ledge band's ramp, built the same way (the ledge then dies out east of x = -45)
+        static readonly (float x, float half, float w, bool rough) LedgeRamp = (-68f, 9f, 30f, false);
         // Dry wash with two graded fords.
         const float FordW = -110f, FordE = 95f;
         // Ledge band (3.5 m step) on the plateau, west half; it ramps out at its east end.
@@ -81,7 +100,7 @@ namespace SimFlake.EditorTools
         static readonly List<Vector3> placedRocks = new List<Vector3>(); // x, z, radius
         static readonly StringBuilder report = new StringBuilder();
 
-        [MenuItem("SimFlake/Build Badlands Traversal World")]
+        [MenuItem("SimFlake/World Generation/Build Badlands Traversal World", priority = 101)]
         public static void BuildMenu()
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
@@ -168,7 +187,7 @@ namespace SimFlake.EditorTools
         static float EscZ(float x) => 55f + 18f * Mathf.Sin(x / 70f + 0.6f) + 10f * N(x / 35f, 3.1f) + 3f * N(x / 9f, 8.7f);
         static float EscStep(float x) => 12f + 2f * N(x / 90f, 5.5f);
         static float SlotCenter(float z) => SlotX + 1.8f * Mathf.Sin(z / 7f);
-        static float SlotBand(float x, float z) => Band(x, SlotCenter(z), SlotHalf, 0.6f);
+        static float SlotBand(float x, float z) => Band(x, SlotCenter(z), SlotHalf, SlotSoft);
 
         /// <summary>Signed horizontal distance from the escarpment edge (positive = up on the plateau).</summary>
         static float EscD(float x, float z)
@@ -177,15 +196,26 @@ namespace SimFlake.EditorTools
             return (z - EscZ(x)) / Mathf.Sqrt(1 + dz * dz);
         }
 
-        /// <summary>Horizontal width of the escarpment's rise: 1.6 m = cliff, tens of metres = a drivable ramp.</summary>
-        static float EscW(float x, float z, out float slot)
+        /// <summary>
+        /// Blends a ramp into a cliff of height h. Where the ramp lies below the cliff surface it is a notch with sharp
+        /// sides (covered by rock walls); where it lies above, it is a debris fan with wide side slopes. The two meet
+        /// where the heights are equal, so there's no seam.
+        /// </summary>
+        static float WithRamp(float h, float x, float z, float d, float step, (float x, float half, float w, bool rough) r)
         {
-            slot = SlotBand(x, z);
-            float w = 1.6f;
-            w = Mathf.Lerp(w, 50f, Band(x, WestRampX, 14f, 12f));  // west: long, even ramp (~15 deg)
-            w = Mathf.Lerp(w, 34f, Band(x, EastTalusX, 22f, 10f)); // east: steeper rockfall slope (~22 deg) + bumps
-            w = Mathf.Lerp(w, SlotLen, slot);                       // middle: narrow slot canyon (~19 deg)
-            return w;
+            if (Mathf.Abs(x - r.x) > r.half + RampFillSoft) return h;
+            float hr = step * Rise(d, r.w, out float t);
+            if (r.rough) hr += 0.7f * Fbm(x / 2.5f, z / 2.5f, 2) * 4 * t * (1 - t); // rockfall bumps on the talus
+            return Mathf.Lerp(h, hr, Band(x, r.x, r.half, hr < h ? RampCutSoft : RampFillSoft));
+        }
+        static float CutBand(float x, (float x, float half, float w, bool rough) r) => Band(x, r.x, r.half, RampCutSoft);
+
+        /// <summary>True where a wall column sits on the side step of a ramp or the slot (narrower face than the cliff).</summary>
+        static bool OnCutSide(Vector2 p)
+        {
+            if (SlotBand(p.x, p.y) > 0.01f) return true;
+            float d = EscD(p.x, p.y), dt = TerD(p.x, p.y);
+            return d > 0 && Ramps.Any(r => CutBand(p.x, r) > 0.01f) || dt > 0 && CutBand(p.x, LedgeRamp) > 0.01f;
         }
 
         /// <summary>Rise profile: 0 at the bottom, 1 at the top, with a talus apron at the foot.</summary>
@@ -200,26 +230,35 @@ namespace SimFlake.EditorTools
 
         static float EscHeight(float x, float z)
         {
-            float d = EscD(x, z);
-            float w = EscW(x, z, out float slot);
-            d -= slot * SlotLen * 0.5f; // the slot is cut into the plateau, not built out from the cliff
-            float f = Rise(d, w, out float t);
-            float h = EscStep(x) * f;
-            // rockfall roughness on the east talus slope
-            h += Band(x, EastTalusX, 22f, 10f) * 0.7f * Fbm(x / 2.5f, z / 2.5f, 2) * 4 * t * (1 - t);
+            float d = EscD(x, z), step = EscStep(x);
+            float h = step * Rise(d, CliffW, out _);
+            foreach (var r in Ramps) h = WithRamp(h, x, z, d, step, r);
+            float slot = SlotBand(x, z);
+            if (slot > 0)
+            {
+                // slot canyon: a ramp (~19 deg) cut down into the plateau, from the cliff foot to the top over SlotLen
+                float floor = EscStep(x) * Rise(d - SlotLen * 0.5f, SlotLen, out _);
+                h = Mathf.Lerp(h, Mathf.Min(h, floor), slot);
+            }
             return h;
         }
 
         static float TerZ(float x) => 165f + 8f * Mathf.Sin(x / 40f) + 5f * N(x / 20f, 1.7f);
 
+        /// <summary>Signed horizontal distance from the ledge band's edge (positive = up).</summary>
+        static float TerD(float x, float z)
+        {
+            float dz = TerZ(x + 0.5f) - TerZ(x - 0.5f);
+            return (z - TerZ(x)) / Mathf.Sqrt(1 + dz * dz);
+        }
+
         static float TerraceHeight(float x, float z)
         {
             float fade = 1 - SmoothStep(-45f, -10f, x);
             if (fade <= 0) return 0;
-            float dz = TerZ(x + 0.5f) - TerZ(x - 0.5f);
-            float d = (z - TerZ(x)) / Mathf.Sqrt(1 + dz * dz);
-            float w = Mathf.Lerp(1.6f, 30f, SmoothStep(-85f, -45f, x));
-            return TerraceStep * fade * Rise(d, w, out _);
+            float d = TerD(x, z);
+            float h = WithRamp(TerraceStep * Rise(d, CliffW, out _), x, z, d, TerraceStep, LedgeRamp);
+            return fade * h;
         }
 
         static float ButteR(Butte b, float ang) =>
@@ -621,40 +660,50 @@ namespace SimFlake.EditorTools
                 red, red, red, orange, orange, maroon, maroon, new Color(0.82f, 0.66f, 0.50f), new Color(0.60f, 0.45f, 0.38f),
             }, 0.03f);
 
-            // escarpment edge, skipping the passes
+            // Escarpment and ledge band. Where a ramp or the slot canyon breaks a cliff, the line turns in, runs up one side
+            // of the notch and back down the other, so one rock face wraps the corners instead of ending in cut-off slabs.
             var pts = new List<Vector2>(); var low = new List<Vector2>();
-            for (float x = -560f; x <= 560f; x += 0.8f)
+            void Corner(Vector2 p, Vector2 from, Vector2 to) // a fan of columns around a convex corner
             {
-                float z = EscZ(x), s = (EscZ(x + 0.5f) - EscZ(x - 0.5f));
-                pts.Add(new Vector2(x, z));
-                low.Add(new Vector2(s, -1).normalized);
+                for (int k = 0; k <= 6; k++) { pts.Add(p); low.Add((Vector2)Vector3.Slerp(from, to, k / 6f)); }
             }
-            Wall(group, "Escarpment", pts, low, p => EscW(p.x, p.y, out _), false, sandstone, p => EscW(p.x, p.y, out float slot) < 9f && slot < 0.01f);
-
-            // slot canyon side walls
-            float zs = EscZ(SlotX);
-            foreach (int side in new[] { -1, 1 })
+            Vector2 SideLow(System.Func<float, float> c, float z, int side) // perpendicular to a notch wall, pointing into it
+            {
+                float dc = (c(z + 0.3f) - c(z - 0.3f)) / 0.6f;
+                return -side * new Vector2(1, -dc).normalized;
+            }
+            // notches: (centre line x(z), wall offset from it, how far back into the plateau the walls run), west to east
+            void CliffPath(System.Func<float, float> lineZ, float xStart, float xEnd, params (System.Func<float, float> c, float off, float len)[] notches)
             {
                 pts.Clear(); low.Clear();
-                for (float z = zs - 2f; z <= zs + SlotLen + 2f; z += 0.6f)
+                Vector2 Low(float x) => new Vector2(lineZ(x + 0.5f) - lineZ(x - 0.5f), -1).normalized;
+                void Run(float a, float b) { for (float x = a; x < b; x += 0.8f) { pts.Add(new Vector2(x, lineZ(x))); low.Add(Low(x)); } }
+                float x0 = xStart;
+                foreach (var (c, off, len) in notches)
                 {
-                    float c = SlotCenter(z), dc = SlotCenter(z + 0.3f) - SlotCenter(z - 0.3f);
-                    pts.Add(new Vector2(c + side * (SlotHalf + 0.3f), z));
-                    var tangent = new Vector2(dc / 0.6f, 1).normalized;
-                    low.Add(new Vector2(-side * tangent.y, side * tangent.x)); // perpendicular, pointing into the slot
+                    float cx = c(lineZ(c(0))), xw = cx - off, xe = cx + off, zTop = lineZ(cx) + len;
+                    // corner pivots sit on the plateau corner: beside the notch's side step and 1.2 m behind the cliff line
+                    // there (the line can run diagonally), so the fan columns measure the full cliff height
+                    var wc = new Vector2(xw - 0.7f, lineZ(xw - 0.7f) + 1.2f); var ec = new Vector2(xe + 0.7f, lineZ(xe + 0.7f) + 1.2f);
+                    Run(x0, xw - 0.8f);
+                    Corner(wc, Low(xw), SideLow(c, wc.y, -1));
+                    for (float z = wc.y + 0.6f; z <= zTop; z += 0.6f) { pts.Add(new Vector2(c(z) - off, z)); low.Add(SideLow(c, z, -1)); }
+                    for (float z = zTop; z >= ec.y + 0.6f; z -= 0.6f) { pts.Add(new Vector2(c(z) + off, z)); low.Add(SideLow(c, z, 1)); }
+                    Corner(ec, SideLow(c, ec.y, 1), Low(xe));
+                    x0 = xe + 0.8f;
                 }
-                Wall(group, side < 0 ? "Slot Canyon West Wall" : "Slot Canyon East Wall", pts, low, _ => 0.6f, false, sandstone, null);
+                Run(x0, xEnd);
             }
+            (System.Func<float, float>, float, float) RampNotch((float x, float half, float w, bool rough) r) =>
+                (_ => r.x, r.half + RampCutSoft / 2, r.w / 2 + 6f);
 
-            // ledge band
-            pts.Clear(); low.Clear();
-            for (float x = -560f; x <= -50f; x += 0.8f)
-            {
-                float s = TerZ(x + 0.5f) - TerZ(x - 0.5f);
-                pts.Add(new Vector2(x, TerZ(x)));
-                low.Add(new Vector2(s, -1).normalized);
-            }
-            Wall(group, "Ledge Band", pts, low, p => Mathf.Lerp(1.6f, 30f, SmoothStep(-85f, -45f, p.x)), false, sandstone, p => p.x < -62f, minHeight: 1.5f);
+            CliffPath(EscZ, -MapEdge, MapEdge, RampNotch(Ramps[0]), (SlotCenter, SlotHalf + SlotSoft / 2, SlotLen + 6f), RampNotch(Ramps[1]));
+            // low minHeight: notch walls shrink to nothing at the back, and should tuck into the ground, not stop as slabs
+            Wall(group, "Escarpment", pts, low, p => OnCutSide(p) ? SlotSoft : CliffW, false, sandstone, null, minHeight: 0.4f);
+
+            // ledge band: dies out toward x = -10, its face shrinking with it
+            CliffPath(TerZ, -MapEdge, -8f, RampNotch(LedgeRamp));
+            Wall(group, "Ledge Band", pts, low, p => OnCutSide(p) ? SlotSoft : CliffW, false, sandstone, null, minHeight: 0.4f);
 
             // buttes
             foreach (var b in Buttes)
@@ -690,14 +739,14 @@ namespace SimFlake.EditorTools
             float along = 0;
             for (int i = 0; i < n; i++)
             {
-                if (i > 0) along += Vector2.Distance(pts[i], pts[i - 1]);
+                // measured a little out on the face, so corner fans (same point, turning normal) still advance the texture
+                if (i > 0) along += Vector2.Distance(pts[i] + low[i].normalized * 1.2f, pts[i - 1] + low[i - 1].normalized * 1.2f);
                 Vector2 p = pts[i], nn = low[i].normalized;
                 outDir[i] = new Vector3(nn.x, 0, nn.y);
                 float faceW = faceWidth(p);
-                // coarse outer tiles: the heightmap's steps are wider, so stand further off
-                float extra = Mathf.Max(Mathf.Abs(p.x), Mathf.Abs(p.y)) > 248f ? 0.6f : 0f;
                 float buttress = 0.8f * (0.5f + 0.5f * N(along / 9f, 0.5f));
-                float lowH = Ground(p + nn * (faceW / 2 + 1.5f)), highH = Ground(p - nn * (faceW / 2 + 1.5f));
+                // the top comes from behind the step, or from p itself for corner pivots (which sit on the top already)
+                float lowH = Ground(p + nn * (faceW / 2 + 1.5f)), highH = Mathf.Max(Ground(p - nn * (faceW / 2 + 1.5f)), Ground(p));
                 valid[i] = highH - lowH > minHeight && (include == null || include(p));
                 for (int r = 0; r <= Rows; r++)
                 {
@@ -705,13 +754,13 @@ namespace SimFlake.EditorTools
                     float tf = Mathf.Clamp01((y - lowH) / Mathf.Max(highH - lowH, 0.1f));
                     float rough = 0.5f + 0.5f * Fbm(along / 2.3f, y / 1.4f, 2);
                     float ledges = 0.15f * Mathf.Sin(y * 3.1f + 2f * N(along / 6f, y / 3f));
-                    float s = faceW / 2 - faceW * tf + 0.7f + extra + 0.6f * rough + buttress + ledges;
+                    float s = faceW / 2 - faceW * tf + 0.7f + 0.6f * rough + buttress + ledges;
                     var q = p + nn * s;
                     if (r == 0) y = Mathf.Min(y, Ground(q) - 0.8f); // always start below the ground right there
                     verts[i * R + r] = new Vector3(q.x, y, q.y);
                     uvs[i * R + r] = new Vector2(along / 4f, y / 16f);
                 }
-                var lip = p - nn * (faceW / 2 + 1.0f + extra);
+                var lip = p - nn * (faceW / 2 + 1.0f);
                 verts[i * R + Rows + 1] = new Vector3(lip.x, Ground(lip) - 0.25f, lip.y);
                 uvs[i * R + Rows + 1] = new Vector2(along / 4f, (highH + 1f) / 16f);
             }
@@ -1082,6 +1131,7 @@ namespace SimFlake.EditorTools
                 float z = EscZ(x) + d;
                 var p = new Vector2(x, z);
                 if (SlotBand(x, z) > 0.01f && d > -3 || Reserved(p, 0.5f)) continue;
+                if (d > -1f && Mathf.Abs(x - EastTalusX) > Ramps[1].half - 2.5f && onTalus > 0.5f) continue; // clear of the notch walls
                 if (onTalus < 0.5f && Random.value > 0.3f) continue;
                 c += PlaceRock(talus, p, onTalus > 0.5f ? RockSize(0.3f, 1.9f) : RockSize(0.3f, 2.6f, 1.6f), allowSteep: onTalus > 0.5f, maxSteep: 60);
             }
@@ -1094,15 +1144,57 @@ namespace SimFlake.EditorTools
                 }
             report.AppendLine($"talus rocks: {c}");
 
-            // slot canyon: a few rocks on the floor to pick a line through
+            // slot canyon: rubble heaped against both walls, pebbles on the floor, a debris fan and big blocks at the mouth,
+            // loose blocks on the rim. A winding lane (SlotLane wide) stays clear of anything bigger than a pebble.
             var slot = Sub("Slot Canyon");
             c = 0;
-            float zs = EscZ(SlotX);
-            for (int k = 0; k < 400 && c < 14; k++)
+            Physics.SyncTransforms();
+            float zs = EscZ(SlotX), off = SlotHalf + SlotSoft / 2;
+            float LaneC(float z) => SlotCenter(z) + 0.5f * Mathf.Sin(z / 9f);
+            for (int k = 0; k < 3000 && c < 90; k++)
             {
-                float z = zs + Random.Range(2f, SlotLen - 2f);
-                var p = new Vector2(SlotCenter(z) + Random.Range(-SlotHalf + 0.6f, SlotHalf - 0.6f), z);
-                c += PlaceRock(slot, p, RockSize(0.25f, 0.8f, 1.5f), allowSteep: true);
+                float z = zs + Random.Range(0.5f, SlotLen - 2f);
+                int side = Random.value < 0.5f ? -1 : 1;
+                float lc = LaneC(z), y = Ground(lc, z) + 0.35f;
+                // distance from the lane centre to this wall's rock face
+                if (!Physics.Raycast(new Vector3(lc, y, z), new Vector3(side, 0, 0), out var hit, 8f)) continue;
+                float u = Random.Range(0.2f, 0.7f); // how far the rock tucks into the face
+                float rad = Mathf.Min(RockSize(0.2f, 1.1f, 1.6f) / 2, (hit.distance - SlotLane / 2) / (1 + u));
+                if (rad < 0.1f) continue;
+                c += PlaceRock(slot, new Vector2(lc + side * (hit.distance - rad * u), z), rad * 2, allowSteep: true);
+            }
+            for (int k = 0, n = 0; k < 400 && n < 120; k++) // pebbles the rover can drive over
+            {
+                float z = zs + Random.Range(-2f, SlotLen - 2f);
+                int ok = PlaceRock(slot, new Vector2(SlotCenter(z) + Random.Range(-1.8f, 1.8f), z), RockSize(0.08f, 0.2f), allowSteep: true);
+                n += ok; c += ok;
+            }
+            for (int k = 0, n = 0; k < 2000 && n < 150; k++) // debris fan spreading out of the mouth
+            {
+                float back = Random.Range(0.5f, 18f) * Random.Range(0.4f, 1f), z = zs - back;
+                float x = SlotX + Random.Range(-1f, 1f) * (off + 0.7f * back);
+                float size = RockSize(0.12f, 1.1f, 2.4f);
+                if (size > 0.3f && Mathf.Abs(x - SlotCenter(zs)) - size / 2 < SlotLane / 2) continue;
+                if (Reserved(new Vector2(x, z), 0.3f)) continue;
+                int ok = PlaceRock(slot, new Vector2(x, z), size, maxSteep: 40);
+                n += ok; c += ok;
+            }
+            foreach (int side in new[] { -1, 1 }) // big fallen blocks flanking the entrance
+                for (int k = 0, n = 0; k < 40 && n < 3; k++)
+                {
+                    float x = SlotCenter(zs) + side * (off + Random.Range(1.5f, 6f));
+                    int ok = PlaceRock(slot, new Vector2(x, EscZ(x) - Random.Range(2.5f, 7f)), RockSize(1.2f, 2.3f, 1f), maxSteep: 40);
+                    n += ok; c += ok;
+                }
+            for (int k = 0, n = 0; k < 800 && n < 40; k++) // loose blocks on the plateau along the rim
+            {
+                float z = zs + Random.Range(1f, SlotLen + 4f);
+                int side = Random.value < 0.5f ? -1 : 1;
+                float size = RockSize(0.25f, 1.4f, 1.8f);
+                var p = new Vector2(SlotCenter(z) + side * (off + 2.2f + size / 2 + Random.Range(0f, 5f)), z);
+                if (EscD(p.x, p.y) < 3f + size / 2) continue; // stay back from the main cliff edge
+                int ok = PlaceRock(slot, p, size, maxSteep: 25);
+                n += ok; c += ok;
             }
             report.AppendLine($"slot canyon rocks: {c}");
 
@@ -1370,8 +1462,8 @@ namespace SimFlake.EditorTools
             Box(st, "Flag Stripe", new Vector3(-4.0f, 4.6f, 2.505f), new Vector3(1.0f, 0.15f, 0.01f), gold, col: false);
             var sign = Group(st, "Sign", new Vector3(3.2f, 0, 3.3f));
             Rod(sign, "Post", Vector3.zero, new Vector3(0, 1.6f, 0), 0.03f, metal);
-            Box(sign, "Board", new Vector3(0, 1.45f, 0.03f), new Vector3(1.4f, 0.4f, 0.02f), tape, col: false);
-            Text(sign, "BASE STATION", new Vector3(0, 1.45f, 0.05f), 180, Color.black, 0.035f);
+            Box(sign, "Board", new Vector3(0, 1.45f, 0.03f), new Vector3(1.7f, 0.4f, 0.02f), tape, col: false);
+            Text(sign, "BASE STATION", new Vector3(0, 1.45f, 0.05f), 180, Color.black, 0.03f);
 
             // rover start box (2.4 m square of tape) and a coned lane heading north
             var start = Group(st, "Rover Start Box", new Vector3(0, 0.005f, 14f));
@@ -1417,31 +1509,29 @@ namespace SimFlake.EditorTools
             startGo.transform.position = new Vector3(StartPos.x, Ground(StartPos), StartPos.y);
             if (icon) EditorGUIUtility.SetIconForObject(startGo, icon);
 
-            var orange = M("PostOrange", new Color(1f, 0.4f, 0.05f), 0.3f);
-            var white = M("TapeWhite", new Color(0.95f, 0.95f, 0.95f), 0.2f);
+            var markerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ArucoPrefabPath);
+            if (markerPrefab == null) Debug.LogWarning($"[Badlands] {ArucoPrefabPath} not found, waypoints get no ArUco posts");
             foreach (var w in Waypoints)
             {
                 var go = new GameObject($"{w.name}{(w.aruco >= 0 ? $" (ArUco {w.aruco})" : " (GNSS only)")}");
                 go.transform.SetParent(group, false);
                 go.transform.position = new Vector3(w.p.x, Ground(w.p), w.p.y);
                 if (icon) EditorGUIUtility.SetIconForObject(go, icon);
-                if (w.aruco < 0) continue;
+                if (w.aruco < 0 || markerPrefab == null) continue;
 
-                // URC-style post: orange/white pole with a marker on each of three faces
-                var t = go.transform;
-                for (int k = 0; k < 4; k++)
-                    Prim(PrimitiveType.Cylinder, t, "Pole", new Vector3(0, 0.15f + k * 0.3f, 0), new Vector3(0.08f, 0.15f, 0.08f), k % 2 == 0 ? orange : white);
-                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Resources/Textures/aruco{w.aruco}.png")
-                          ?? AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Resources/Textures/Aruco/aruco{w.aruco}.png");
-                var mm = new Material(Shader.Find("Unlit/Texture")) { name = $"Aruco{w.aruco}", mainTexture = tex };
-                AssetDatabase.CreateAsset(mm, $"{AssetDir}/Materials/Aruco{w.aruco}.mat");
-                for (int k = 0; k < 3; k++)
+                // the team's ArUco post prefab, linked (edits to the prefab show up here). TripleAruco picks the marker
+                // texture from 'id' when Play starts, so the faces look blank in edit mode.
+                var marker = (GameObject)PrefabUtility.InstantiatePrefab(markerPrefab, go.transform);
+                marker.GetComponent<TripleAruco>().id = w.aruco;
+                PrefabUtility.RecordPrefabInstancePropertyModifications(marker.GetComponent<TripleAruco>());
+                // the prefab's pivot is not at its post, so move it until the bottom of "Post" sits on the ground here
+                var post = marker.GetComponentsInChildren<Renderer>().FirstOrDefault(r => r.name == "Post");
+                if (post != null)
                 {
-                    var face = Group(t, "Marker Face", new Vector3(0, 1.32f, 0), k * 120);
-                    Box(face, "Backing", new Vector3(0, 0, 0.09f), new Vector3(0.24f, 0.24f, 0.01f), white, col: false);
-                    var q = Prim(PrimitiveType.Quad, face, $"ArUco {w.aruco}", new Vector3(0, 0, 0.096f), new Vector3(0.2f, 0.2f, 1), mm, new Vector3(0, 180, 0), false);
+                    var b = post.bounds;
+                    marker.transform.position += go.transform.position - new Vector3(b.center.x, b.min.y, b.center.z);
                 }
-                Box(t, "Marker Mount", new Vector3(0, 1.32f, 0), new Vector3(0.18f, 0.26f, 0.18f), white);
+                else Debug.LogWarning("[Badlands] ArUco prefab has no child called 'Post', can't place it on the ground");
             }
         }
 
@@ -1511,6 +1601,14 @@ namespace SimFlake.EditorTools
             float wl = 0, wr = 0;
             for (float dx = 0; dx < 8; dx += 0.1f) { if (wl == 0 && Hit(SlotCenter(zm) - dx, zm) > floor + 2) wl = dx; if (wr == 0 && Hit(SlotCenter(zm) + dx, zm) > floor + 2) wr = dx; }
             sb.AppendLine($"slot canyon width 12 m in: {wl + wr:F1} m, walls {Hit(SlotCenter(zm) + 5, zm) - floor:F1} m high");
+            float gap = float.MaxValue, gapAt = 0;
+            for (float z = ze(SlotX) + 1; z < ze(SlotX) + SlotLen - 3; z += 0.5f)
+            {
+                var o = new Vector3(SlotCenter(z), Hit(SlotCenter(z), z) + 0.5f, z);
+                if (Physics.Raycast(o, Vector3.left, out var a, 10) && Physics.Raycast(o, Vector3.right, out var b, 10) && a.distance + b.distance < gap)
+                { gap = a.distance + b.distance; gapAt = z - ze(SlotX); }
+            }
+            sb.AppendLine($"slot canyon narrowest gap 0.5 m above the floor (walls + rocks): {gap:F1} m, {gapAt:F0} m in");
             foreach (float x in new[] { -80f, 60f, 220f })
                 sb.AppendLine($"escarpment at x={x}: cliff {Hit(x, ze(x) + 3) - Hit(x, ze(x) - 3):F1} m over 6 m");
             sb.AppendLine($"ledge band at x=-150: {Hit(-150, TerZ(-150) + 3) - Hit(-150, TerZ(-150) - 3):F1} m");
@@ -1584,8 +1682,17 @@ namespace SimFlake.EditorTools
                 ("escarpment", new Vector3(-30, 4, -5), new Vector3(10, 8, 60)),
                 ("slot_entrance", new Vector3(SlotX - 3, 3, zs - 22), new Vector3(SlotX, 4, zs + 10)),
                 ("slot_inside", new Vector3(SlotCenter(zs + 4), 1.3f, zs + 4), new Vector3(SlotCenter(zs + 30), 1.5f, zs + 30)),
+                ("slot_mouth_above", new Vector3(SlotX + 6, 22, zs - 16), new Vector3(SlotX, 0, zs + 3)),
+                ("slot_back", new Vector3(SlotCenter(zs + SlotLen + 8), 3, zs + SlotLen + 8), new Vector3(SlotCenter(zs + 22), 0, zs + 22)),
+                ("slot_corner_west", new Vector3(SlotX - 12, 14, zs - 10), new Vector3(SlotCenter(zs) - SlotHalf - 0.6f, 0, zs + 0.5f)),
+                ("slot_corner_east", new Vector3(SlotX + 12, 14, zs - 10), new Vector3(SlotCenter(zs) + SlotHalf + 0.6f, 0, zs + 0.5f)),
+                ("seam_east", new Vector3(225, 15, -40), new Vector3(275, 0, 10)),
+                ("escarpment_east_end", new Vector3(470, 30, -20), new Vector3(540, 10, 40)),
                 ("west_ramp", new Vector3(WestRampX + 45, 8, zw - 35), new Vector3(WestRampX, 6, zw + 5)),
                 ("east_talus", new Vector3(EastTalusX - 40, 6, zt - 30), new Vector3(EastTalusX, 6, zt)),
+                ("west_ramp_east_corner", new Vector3(WestRampX + 32, 5, zw - 16), new Vector3(WestRampX + 15, 4, zw + 2)),
+                ("west_ramp_from_top", new Vector3(WestRampX, 4, zw + 32), new Vector3(WestRampX + 5, -4, zw - 10)),
+                ("east_talus_west_corner", new Vector3(EastTalusX - 42, 5, zt - 14), new Vector3(EastTalusX - 23, 4, zt + 2)),
                 ("hoodoos", new Vector3(95, 4, -90), new Vector3(150, 3, -50)),
                 ("boulder_field", new Vector3(-115, 3, -100), new Vector3(-165, 0, -50)),
                 ("arroyo", new Vector3(-60, 4, ArZ(-60) - 25), new Vector3(-30, -1, ArZ(-30))),
@@ -1593,6 +1700,9 @@ namespace SimFlake.EditorTools
                 ("dunes", new Vector3(130, 8, 110), new Vector3(190, 2, 170)),
                 ("crater", new Vector3(-120, 10, 180), new Vector3(-150, -1, 210)),
                 ("ledge_band", new Vector3(-120, 3, TerZ(-120) - 25), new Vector3(-140, 3, TerZ(-140))),
+                ("ledge_ramp", new Vector3(-48, 4, TerZ(-48) - 22), new Vector3(-68, 1, TerZ(-68))),
+                ("ledge_end", new Vector3(-20, 5, TerZ(-20) - 18), new Vector3(-45, 0, TerZ(-45))),
+                ("station_sign", new Vector3(-20 + 3.2f, 1.6f, -205 + 6f), new Vector3(-20 + 3.2f, 1.45f, -205 + 3.3f)),
                 ("butte", new Vector3(10, 4, 105), new Vector3(70, 10, 150)),
                 ("waypoint_post", new Vector3(-37, 1.5f, 101), new Vector3(-40, 1.2f, 105)),
             };

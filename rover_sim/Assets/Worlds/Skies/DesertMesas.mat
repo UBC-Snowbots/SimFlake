@@ -29,18 +29,23 @@ Material:
     - _CloudScale: 0.9
     - _CloudSpeed: 0.004
     - _Exposure: 1
+    - _GlowAmount: 1
     - _MountainHeight: 5
+    - _Overcast: 0
     - _Seed: 11.3
     - _SnowLine: 1.2
+    - _StarIntensity: 0
     - _SunGlow: 0.6
     - _SunSize: 0.0004
     m_Colors:
     - _AlpenGlow: {r: 0.85, g: 0.62, b: 0.5, a: 1}
     - _CloudLit: {r: 0.98, g: 0.97, b: 0.95, a: 1}
     - _CloudShadow: {r: 0.66, g: 0.68, b: 0.76, a: 1}
+    - _DiscColor: {r: 2, g: 1.84, b: 1.5, a: 1}
     - _FarMountainColor: {r: 0.66, g: 0.58, b: 0.58, a: 1}
     - _GroundColor: {r: 0.45, g: 0.36, b: 0.28, a: 1}
     - _HorizonColor: {r: 0.8, g: 0.79, b: 0.75, a: 1}
+    - _LandTint: {r: 1, g: 1, b: 1, a: 1}
     - _NearMountainColor: {r: 0.52, g: 0.38, b: 0.31, a: 1}
     - _SunColor: {r: 1, g: 0.95, b: 0.86, a: 1}
     - _ZenithColor: {r: 0.16, g: 0.36, b: 0.68, a: 1}

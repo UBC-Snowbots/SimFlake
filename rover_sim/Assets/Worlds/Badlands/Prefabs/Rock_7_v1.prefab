@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &6232240094190112696
+--- !u!1001 &6314233956124671056
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -58,20 +58,20 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 148852, guid: 4b657cd7d8676734cb5c33ff6eeb7fdd, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 4948566054958917885}
+      addedObject: {fileID: 2365841556985290009}
   m_SourcePrefab: {fileID: 100100000, guid: 4b657cd7d8676734cb5c33ff6eeb7fdd, type: 3}
---- !u!1 &6232240094189996748 stripped
+--- !u!1 &6314233956124817700 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 148852, guid: 4b657cd7d8676734cb5c33ff6eeb7fdd, type: 3}
-  m_PrefabInstance: {fileID: 6232240094190112696}
+  m_PrefabInstance: {fileID: 6314233956124671056}
   m_PrefabAsset: {fileID: 0}
---- !u!64 &4948566054958917885
+--- !u!64 &2365841556985290009
 MeshCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6232240094189996748}
+  m_GameObject: {fileID: 6314233956124817700}
   m_Material: {fileID: 13400000, guid: 58fbc2d43def468bd9381cf3f3dcf88f, type: 2}
   m_IncludeLayers:
     serializedVersion: 2

@@ -15,7 +15,7 @@ namespace SimFlake.EditorTools
     /// </summary>
     public static class SimFlakeTools
     {
-        [MenuItem("SimFlake/Build Linux Player (scenes in Build Settings)")]
+        [MenuItem("SimFlake/Build Linux Player (scenes in Build Settings)", priority = 300)]
         public static void BuildLinuxMenu()
         {
             var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
@@ -177,7 +177,7 @@ namespace SimFlake.EditorTools
         static string GetPath(Transform t) => t.parent == null ? t.name : GetPath(t.parent) + "/" + t.name;
 
         /// <summary>Checks the JSON layer used to talk to rosbridge. Run from the menu or with -executeMethod.</summary>
-        [MenuItem("SimFlake/Run ROS Message Self-Test")]
+        [MenuItem("SimFlake/Run ROS Message Self-Test", priority = 301)]
         public static void SelfTest()
         {
             int fails = 0;
