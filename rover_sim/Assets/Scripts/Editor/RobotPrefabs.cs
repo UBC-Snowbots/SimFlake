@@ -11,6 +11,7 @@ using Object = UnityEngine.Object;
 namespace SimFlake.EditorTools
 {
     /// <summary>
+    /// ONE-OFF MIGRATION (already run). Don't use it to add new robots; see "Adding a robot" in CLAUDE.md.
     /// Turns the rover and arm that were copied into each scene into shared prefabs.
     ///   -executeMethod SimFlake.EditorTools.RobotPrefabs.MakeChassisPrefab [-dryrun]
     ///   -executeMethod SimFlake.EditorTools.RobotPrefabs.MakeArmPrefab [-dryrun]
@@ -19,7 +20,7 @@ namespace SimFlake.EditorTools
     /// </summary>
     public static class RobotPrefabs
     {
-        public const string ChassisPrefabPath = "Assets/Robots/Chassis/Chassis.prefab";
+        public const string ChassisPrefabPath = "Assets/Robots/Chassis/chassis_2024.prefab";
         public const string ArmPrefabPath = "Assets/Robots/Arm/Arm.prefab";
         const string ChassisSourceScene = "Assets/Scenes/TaskWorlds/WaypointTask.unity";
         static readonly string[] ChassisOtherScenes = { "Assets/Scenes/ChassisPlayground.unity", "Assets/Scenes/SampleScene.unity" };
