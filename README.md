@@ -29,9 +29,9 @@ Unity Hub and the exact Unity version the project uses. Then, in Unity Hub: **Pr
 Topics, conventions and how the ROS link works are documented in [CLAUDE.md](CLAUDE.md).
 
 ## Adding things
-- **Unity assets** (Asset Store or otherwise): import them into `rover_sim/Assets` and commit. Everyone gets them on pull.
-- **URDF robots**: copy the ROS description package into `Assets/`, right-click the `.urdf` and choose
-  **Import Robot from Selected URDF file** (VHACD for exact colliders). Then add `MotorController` / `ArmController` and sensors.
+- **Unity assets** (Asset Store or otherwise): import them, then drag the new folder into `rover_sim/Assets/ThirdParty` in Unity (the Asset Store always imports at the top of `Assets/`) and commit. Everyone gets them on pull.
+- **URDF robots**: copy the ROS description package into `Assets/Robots/Descriptions/`, right-click the `.urdf` and choose
+  **Import Robot from Selected URDF file** (VHACD for exact colliders). Then add `MotorController` / `ArmController` and sensors, or update the prefab in `Assets/Robots/`.
 - **New sensors / topics**: see "Writing sim code" in [CLAUDE.md](CLAUDE.md). It's a few lines with `Ros.Advertise` / `Ros.Subscribe`.
 
 ## Troubleshooting

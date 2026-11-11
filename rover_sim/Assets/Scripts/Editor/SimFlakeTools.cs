@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using SimFlake.Ros;
@@ -15,7 +16,7 @@ namespace SimFlake.EditorTools
     /// </summary>
     public static class SimFlakeTools
     {
-        [MenuItem("SimFlake/Build Linux Player (scenes in Build Settings)")]
+        [MenuItem("SimFlake/Build Linux Player (scenes in Build Settings)", priority = 300)]
         public static void BuildLinuxMenu()
         {
             var scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
@@ -176,8 +177,92 @@ namespace SimFlake.EditorTools
 
         static string GetPath(Transform t) => t.parent == null ? t.name : GetPath(t.parent) + "/" + t.name;
 
+        // Everything SimFlake itself uses. Their dependencies (followed through prefabs, materials, terrain layers...) are "used".
+        static readonly string[] OwnFolders = {
+            "Assets/Scenes", "Assets/Robots", "Assets/Worlds", "Assets/Resources", "Assets/Scripts", "Assets/Shaders", "Assets/Materials",
+        };
+
+        // Assets that code loads by path rather than by reference: the world builders (Editor/*Builder.cs) and
+        // tools/make_badlands_textures.py (reads the *_BaseColor.tif sources). Keep this list in sync with them.
+        static IEnumerable<string> PathLoadedAssets()
+        {
+            const string tsa = "Assets/ThirdParty/TerrainSampleAssets";
+            foreach (var t in new[] { "Pebbles_A", "Pebbles_B", "Pebbles_C", "Rock", "Sand", "Grass_Dry", "Soil_Rocks" })
+            {
+                yield return $"{tsa}/Textures/Terrain/{t}_Normal.tif";
+                yield return $"{tsa}/Textures/Terrain/{t}_BaseColor.tif";
+            }
+            yield return $"{tsa}/TerrainLayers/Sand_TerrainLayer.terrainlayer";
+            foreach (var p in new[] { "Bush_A", "Bush_B", "BushDry_A", "BushDry_B", "Heather_A", "GrassDry_A", "GrassDry_B", "GrassDry_C" })
+                yield return $"{tsa}/Prefabs/{p}.prefab";
+            foreach (var g in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ThirdParty/HQ Rocks/Prefabs" })) yield return AssetDatabase.GUIDToAssetPath(g);
+            yield return "Assets/ThirdParty/HQ Rocks/Materials/Rock_3_v2.mat";
+        }
+
+        /// <summary>
+        /// Lists files under -check (comma-separated folders/files) that nothing SimFlake uses depends on, and writes
+        /// them to -out (one path per line). Used before deleting third-party or leftover assets.
+        /// </summary>
+        public static void ReportUnusedAssets()
+        {
+            var roots = AssetDatabase.FindAssets("", OwnFolders).Select(AssetDatabase.GUIDToAssetPath)
+                                     .Where(p => !AssetDatabase.IsValidFolder(p)).Concat(PathLoadedAssets()).Distinct().ToArray();
+            var missing = PathLoadedAssets().Where(p => AssetDatabase.LoadMainAssetAtPath(p) == null).ToArray();
+            foreach (var m in missing) Debug.LogError("[Unused] path-loaded asset not found: " + m);
+            var used = new HashSet<string>(AssetDatabase.GetDependencies(roots, true));
+            Debug.Log($"[Unused] {roots.Length} roots, {used.Count} used assets");
+
+            var unused = new List<string>();
+            foreach (var target in (Arg("-check") ?? "").Split(',').Where(s => s.Length > 0))
+            {
+                var files = AssetDatabase.IsValidFolder(target)
+                    ? AssetDatabase.FindAssets("", new[] { target }).Select(AssetDatabase.GUIDToAssetPath).Where(p => !AssetDatabase.IsValidFolder(p)).Distinct().ToArray()
+                    : new[] { target };
+                var u = files.Where(f => !used.Contains(f)).ToArray();
+                long bytes = u.Sum(f => File.Exists(f) ? new FileInfo(f).Length : 0);
+                Debug.Log($"[Unused] {target}: {files.Length - u.Length} used, {u.Length} unused ({bytes / 1e6:F0} MB)");
+                foreach (var f in files.Where(used.Contains)) Debug.Log("[Unused]   keep " + f);
+                unused.AddRange(u);
+            }
+            string outPath = Arg("-out");
+            if (outPath != null) File.WriteAllLines(outPath, unused);
+            if (Application.isBatchMode) EditorApplication.Exit(missing.Length == 0 ? 0 : 1);
+        }
+
+        /// <summary>
+        /// Opens every scene under Assets/Scenes and logs missing scripts, missing prefabs and broken references
+        /// (a reference that was set but whose target no longer exists). Exit code 1 if anything is missing.
+        /// </summary>
+        public static void CheckMissingRefs()
+        {
+            int total = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(path);
+                int n = 0;
+                foreach (var t in scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Transform>(true)))
+                {
+                    if (PrefabUtility.IsPrefabAssetMissing(t.gameObject)) { n++; Debug.LogWarning($"[Refs] {path}: missing prefab {GetPath(t)}"); }
+                    foreach (var c in t.GetComponents<Component>())
+                    {
+                        if (c == null) { n++; Debug.LogWarning($"[Refs] {path}: missing script on {GetPath(t)}"); continue; }
+                        var it = new SerializedObject(c).GetIterator();
+                        while (it.Next(true))
+                            if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue == null
+                                && it.objectReferenceInstanceIDValue != 0)
+                            { n++; Debug.LogWarning($"[Refs] {path}: broken {c.GetType().Name}.{it.propertyPath} on {GetPath(t)}"); }
+                    }
+                }
+                Debug.Log($"[Refs] {path}: {n} problems");
+                total += n;
+            }
+            Debug.Log($"[Refs] TOTAL {total}");
+            if (Application.isBatchMode) EditorApplication.Exit(total == 0 ? 0 : 1);
+        }
+
         /// <summary>Checks the JSON layer used to talk to rosbridge. Run from the menu or with -executeMethod.</summary>
-        [MenuItem("SimFlake/Run ROS Message Self-Test")]
+        [MenuItem("SimFlake/Run ROS Message Self-Test", priority = 301)]
         public static void SelfTest()
         {
             int fails = 0;
