@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "rover_sim", "Assets")
-SRC = os.path.join(ROOT, "TerrainSampleAssets", "Textures", "Terrain")
+SRC = os.path.join(ROOT, "ThirdParty", "TerrainSampleAssets", "Textures", "Terrain")
 DST = os.path.join(ROOT, "Worlds", "BadlandsTextures")
 
 # output name: (source texture, target mean RGB, contrast)

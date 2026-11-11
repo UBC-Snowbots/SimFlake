@@ -26,7 +26,7 @@ namespace SimFlake.EditorTools
         const string AssetDir = "Assets/Worlds/Badlands";
         const string TexDir = "Assets/Worlds/BadlandsTextures"; // tinted albedos from tools/make_badlands_textures.py
         const string RootName = "Generated World";
-        const string ArucoPrefabPath = "Assets/Scripts/ArucoMarker/ArucoMarker_75cm.prefab";
+        const string ArucoPrefabPath = "Assets/Prefabs/Props/ArucoMarker_75cm.prefab";
 
         const float TileSize = 500f, BaseY = -20f, HeightRange = 150f;
         // Cliff faces run right to the edge of the 1.5 km map (the cliffs keep going up the boundary mountains).
@@ -366,7 +366,7 @@ namespace SimFlake.EditorTools
                 {
                     name = s.layer.ToString(),
                     diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"{TexDir}/{s.layer}_Albedo.jpg"),
-                    normalMapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/TerrainSampleAssets/Textures/Terrain/{s.normal}_Normal.tif"),
+                    normalMapTexture = AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/ThirdParty/TerrainSampleAssets/Textures/Terrain/{s.normal}_Normal.tif"),
                     tileSize = new Vector2(s.tile, s.tile),
                     normalScale = 1, smoothness = 0.05f, metallic = 0,
                 };
@@ -588,7 +588,7 @@ namespace SimFlake.EditorTools
 
         static GameObject FoliagePrefab(string src, string matName, Color tint, float sat, bool collider)
         {
-            var srcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/TerrainSampleAssets/Prefabs/{src}.prefab");
+            var srcPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"Assets/ThirdParty/TerrainSampleAssets/Prefabs/{src}.prefab");
             var mesh = srcPrefab.GetComponentInChildren<MeshFilter>().sharedMesh;
             var mat = FoliageMaterial(srcPrefab.GetComponentInChildren<MeshRenderer>().sharedMaterial, matName, tint, sat);
             var go = new GameObject(src);
@@ -853,8 +853,8 @@ namespace SimFlake.EditorTools
             m.SetTexture("_BumpMap", nor);
             m.EnableKeyword("_NORMALMAP");
             // real rock grain on top of the bands (detail tile = 2 m)
-            m.SetTexture("_DetailAlbedoMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/TerrainSampleAssets/Textures/Terrain/Rock_BaseColor.tif"));
-            m.SetTexture("_DetailNormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/TerrainSampleAssets/Textures/Terrain/Rock_Normal.tif"));
+            m.SetTexture("_DetailAlbedoMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/ThirdParty/TerrainSampleAssets/Textures/Terrain/Rock_BaseColor.tif"));
+            m.SetTexture("_DetailNormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/ThirdParty/TerrainSampleAssets/Textures/Terrain/Rock_Normal.tif"));
             m.SetTextureScale("_DetailAlbedoMap", new Vector2(2, 8));
             m.SetFloat("_DetailNormalMapScale", 1.2f);
             m.EnableKeyword("_DETAIL_MULX2");
@@ -886,7 +886,7 @@ namespace SimFlake.EditorTools
             {
                 buff, buff, buff, grey, grey, pale, pale, new Color(0.58f, 0.50f, 0.44f), new Color(0.66f, 0.55f, 0.44f),
             }, 0.06f);
-            var capMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/HQ Rocks/Materials/Rock_3_v2.mat") ?? NewMaterial("Caprock", new Color(0.4f, 0.3f, 0.25f), 0.1f);
+            var capMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/ThirdParty/HQ Rocks/Materials/Rock_3_v2.mat") ?? NewMaterial("Caprock", new Color(0.4f, 0.3f, 0.25f), 0.1f);
 
             // variants 0-1: capless eroded cones, 2-7: capped, 8-9: tall capped
             const int Variants = 10;
@@ -1047,7 +1047,7 @@ namespace SimFlake.EditorTools
         static void MakeRockPrefabs()
         {
             rockPrefabs = new List<(GameObject, float)>();
-            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/HQ Rocks/Prefabs" }))
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ThirdParty/HQ Rocks/Prefabs" }))
             {
                 var src = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
                 var inst = (GameObject)PrefabUtility.InstantiatePrefab(src);

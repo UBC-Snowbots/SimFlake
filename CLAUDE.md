@@ -11,7 +11,7 @@ Hard requirements (don't break these):
 - Keeps every current feature: GNSS, RGB cameras, IMU, drive control (`/cmd_vel`), URDF prefabs of the arm and chassis,
   task worlds, ArUco markers, lidar, wheel/joint odometry.
 - URDFs can still be imported as prefabs with as little work as possible (Unity URDF-Importer, see below).
-- Unity assets (Asset Store etc.) can be added and reach everyone else through git. Commit them under `rover_sim/Assets`.
+- Unity assets (Asset Store etc.) can be added and reach everyone else through git. Commit them under `rover_sim/Assets/ThirdParty` (Unity imports packs at the `Assets/` root; move the folder in the editor).
 
 Soft goals:
 - Performance and ease of use. A new member should only need to: install Unity Hub, clone SimFlake, run `./setup.sh`,
@@ -86,6 +86,22 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 | `/joint_states`, `/arm/sim_feedback` | JointState, Float64MultiArray | `ArmController` |
 | `/chatter` / `/listener` | std_msgs/String | `testnode` (connection test, SampleScene) |
 
+## Folder layout (`rover_sim/Assets`)
+```
+Robots/        Chassis/Chassis.prefab, Arm/Arm.prefab, Descriptions/ (URDF packages + importer output)
+Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
+Scenes/        scenes (TaskWorlds/ for competition-style worlds)
+Worlds/        per-world data: Badlands/ and ChassisPlayground/Generated/ are builder output (wiped on rebuild),
+               <Scene>/Terrain.asset are hand-made terrains, Skies/ the sky materials
+Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Sensors/, Environment/ (sky, ArUco), Tools/ (cameras,
+               FPS, test node), Editor/ (builders, SimFlakeTools)
+Materials/, Shaders/, Resources/   ours
+ThirdParty/    Asset Store / downloaded packs, unchanged (HQ Rocks, klen, TerrainSampleAssets, ...)
+TextMesh Pro/  stays at the root (TMP expects it there)
+```
+Builders and `SimFlakeTools.PathLoadedAssets()` load some assets by path; grep for `"Assets/` before moving things.
+Move assets with their `.meta` (in the editor, or `AssetDatabase.MoveAsset` headless), then run `CheckMissingRefs`.
+
 ## Scenes
 `Assets/Scenes/ChassisPlayground` (chassis), `ArmScene` (arm on a table), `TaskWorlds/WaypointTask` (chassis + GPS +
 lidar + cameras), `SampleScene` (older all-in-one playground). The moving body is `chassis_24/base_link/chassis_link`
@@ -104,7 +120,7 @@ Build Playground Features`, or `-executeMethod SimFlake.EditorTools.WorldBuilder
 and re-run rather than hand-editing those objects; a re-run deletes and rebuilds them. The sky is a procedural shader
 (`Shaders/MountainSkybox.shader`, material `Worlds/Skies/SunsetMountains.mat`), so it has no textures. The sun follows the directional light.
 Time of day (Sunrise/Midday/Sunset/Night) and weather (Clear/Cloudy) are independent settings on the scene's
-`Sky Environment` object (`Scripts/SkyEnvironment.cs`). Change them in the inspector (also during Play), from
+`Sky Environment` object (`Scripts/Environment/SkyEnvironment.cs`). Change them in the inspector (also during Play), from
 `SimFlake > Environment`, or in a player with `--time-of-day night --weather cloudy`. It drives a runtime copy of the sky
 material, the sun/moon light, ambient, fog and reflections. Scenes are saved with the plain material (`SkyBuilder` hooks
 scene saving), so don't be surprised the `.mat` doesn't change. Per-time looks are the `Get(TimeOfDay)` table; per-scene
@@ -129,14 +145,14 @@ Cliffs are terrain steps covered by generated strata wall meshes (the heightmap 
 Ramps (west ramp, east talus, the ledge band's ramp) are notches: sharp cut sides where they sink into the plateau, a wide
 debris fan where they stand out below the cliff (`WithRamp`). Each cliff face is one mesh (`CliffPath`) that wraps into
 every notch and the slot canyon and runs to the map edge; any terrain step without a face shows smeared texture.
-Waypoint ArUco posts are linked instances of `Scripts/ArucoMarker/ArucoMarker_75cm.prefab` (`TripleAruco.id` set per
+Waypoint ArUco posts are linked instances of `Prefabs/Props/ArucoMarker_75cm.prefab` (`TripleAruco.id` set per
 waypoint; marker textures only appear in Play mode). The builder places them by the bottom of the prefab's `Post` child.
 Shrubs are terrain trees with capsule colliders (they block the rover and show on lidar); grass has no collision.
 A rebuild rewrites ~40 MB of generated assets with new GUIDs, so commit rebuilds sparingly.
 
 ## Importing URDFs
 Package `com.unity.robotics.urdf-importer` v0.5.2 (git URL in `Packages/manifest.json`, downloads automatically).
-Copy the ROS description package into `Assets/`, right-click the `.urdf` and choose **Import Robot from Selected URDF
+Copy the ROS description package into `Assets/Robots/Descriptions/`, right-click the `.urdf` and choose **Import Robot from Selected URDF
 file**. Use the VHACD collider option for exact meshes (chassis and arm). Then add `MotorController` / `ArmController`
 and sensors, and save it as (or into) the prefab under `Assets/Robots/`.
 
@@ -182,7 +198,7 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 
 ## Housekeeping
 - `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `Builds/` are local only (gitignored).
-- `Assets/TerrainSampleAssets` (Unity's free Terrain Sample Asset Pack, ~1.9 GB) is kept whole on purpose: the brushes,
+- `Assets/ThirdParty/TerrainSampleAssets` (Unity's free Terrain Sample Asset Pack, ~1.9 GB) is kept whole on purpose: the brushes,
   heightmaps and extra plants are for future worlds. Deleted assets can be restored from history with
   `git checkout <commit> -- <path>`; slimming clones would need a history rewrite (team decision, not done).
 - Before deleting assets, run `SimFlakeTools.ReportUnusedAssets -check "Assets/<folder>,..." -out unused.txt`. It follows

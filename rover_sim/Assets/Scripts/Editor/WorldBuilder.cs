@@ -18,7 +18,7 @@ namespace SimFlake.EditorTools
     public static class WorldBuilder
     {
         const string ScenePath = "Assets/Scenes/ChassisPlayground.unity";
-        const string AssetDir = "Assets/Worlds/ChassisPlayground";
+        const string AssetDir = "Assets/Worlds/ChassisPlayground/Generated"; // wiped on rebuild; the base terrain sits one level up
         const string RootName = "Generated Features";
 
         // Layout (world coordinates, rover spawns near (60.6, 47.3) facing +x / east).
@@ -147,7 +147,7 @@ namespace SimFlake.EditorTools
             mesh.RecalculateBounds();
             AssetDatabase.CreateAsset(mesh, AssetDir + "/SandPit.asset");
 
-            var sandLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>("Assets/TerrainSampleAssets/TerrainLayers/Sand_TerrainLayer.terrainlayer");
+            var sandLayer = AssetDatabase.LoadAssetAtPath<TerrainLayer>("Assets/ThirdParty/TerrainSampleAssets/TerrainLayers/Sand_TerrainLayer.terrainlayer");
             var sand = NewMaterial("Sand", new Color(0.93f, 0.85f, 0.70f), sandLayer ? sandLayer.diffuseTexture : null,
                 sandLayer ? sandLayer.normalMapTexture : null, 0.1f);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -163,7 +163,7 @@ namespace SimFlake.EditorTools
 
         static void ScatterRocks(Transform pit)
         {
-            var prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/HQ Rocks/Prefabs" })
+            var prefabs = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ThirdParty/HQ Rocks/Prefabs" })
                 .Select(g => AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(g))).ToArray();
             if (prefabs.Length == 0) { Debug.LogWarning("[WorldBuilder] no HQ Rocks prefabs found"); return; }
             var rocks = new GameObject("Rocks").transform;

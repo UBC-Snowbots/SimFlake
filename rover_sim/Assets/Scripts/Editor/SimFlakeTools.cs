@@ -186,7 +186,7 @@ namespace SimFlake.EditorTools
         // tools/make_badlands_textures.py (reads the *_BaseColor.tif sources). Keep this list in sync with them.
         static IEnumerable<string> PathLoadedAssets()
         {
-            const string tsa = "Assets/TerrainSampleAssets";
+            const string tsa = "Assets/ThirdParty/TerrainSampleAssets";
             foreach (var t in new[] { "Pebbles_A", "Pebbles_B", "Pebbles_C", "Rock", "Sand", "Grass_Dry", "Soil_Rocks" })
             {
                 yield return $"{tsa}/Textures/Terrain/{t}_Normal.tif";
@@ -195,8 +195,8 @@ namespace SimFlake.EditorTools
             yield return $"{tsa}/TerrainLayers/Sand_TerrainLayer.terrainlayer";
             foreach (var p in new[] { "Bush_A", "Bush_B", "BushDry_A", "BushDry_B", "Heather_A", "GrassDry_A", "GrassDry_B", "GrassDry_C" })
                 yield return $"{tsa}/Prefabs/{p}.prefab";
-            foreach (var g in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/HQ Rocks/Prefabs" })) yield return AssetDatabase.GUIDToAssetPath(g);
-            yield return "Assets/HQ Rocks/Materials/Rock_3_v2.mat";
+            foreach (var g in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/ThirdParty/HQ Rocks/Prefabs" })) yield return AssetDatabase.GUIDToAssetPath(g);
+            yield return "Assets/ThirdParty/HQ Rocks/Materials/Rock_3_v2.mat";
         }
 
         /// <summary>
