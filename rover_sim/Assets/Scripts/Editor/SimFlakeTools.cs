@@ -176,6 +176,38 @@ namespace SimFlake.EditorTools
 
         static string GetPath(Transform t) => t.parent == null ? t.name : GetPath(t.parent) + "/" + t.name;
 
+        /// <summary>
+        /// Opens every scene under Assets/Scenes and logs missing scripts, missing prefabs and broken references
+        /// (a reference that was set but whose target no longer exists). Exit code 1 if anything is missing.
+        /// </summary>
+        public static void CheckMissingRefs()
+        {
+            int total = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:Scene", new[] { "Assets/Scenes" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(path);
+                int n = 0;
+                foreach (var t in scene.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Transform>(true)))
+                {
+                    if (PrefabUtility.IsPrefabAssetMissing(t.gameObject)) { n++; Debug.LogWarning($"[Refs] {path}: missing prefab {GetPath(t)}"); }
+                    foreach (var c in t.GetComponents<Component>())
+                    {
+                        if (c == null) { n++; Debug.LogWarning($"[Refs] {path}: missing script on {GetPath(t)}"); continue; }
+                        var it = new SerializedObject(c).GetIterator();
+                        while (it.Next(true))
+                            if (it.propertyType == SerializedPropertyType.ObjectReference && it.objectReferenceValue == null
+                                && it.objectReferenceInstanceIDValue != 0)
+                            { n++; Debug.LogWarning($"[Refs] {path}: broken {c.GetType().Name}.{it.propertyPath} on {GetPath(t)}"); }
+                    }
+                }
+                Debug.Log($"[Refs] {path}: {n} problems");
+                total += n;
+            }
+            Debug.Log($"[Refs] TOTAL {total}");
+            if (Application.isBatchMode) EditorApplication.Exit(total == 0 ? 0 : 1);
+        }
+
         /// <summary>Checks the JSON layer used to talk to rosbridge. Run from the menu or with -executeMethod.</summary>
         [MenuItem("SimFlake/Run ROS Message Self-Test", priority = 301)]
         public static void SelfTest()
