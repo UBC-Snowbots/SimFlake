@@ -182,8 +182,9 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 
 ## Housekeeping
 - `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `Builds/` are local only (gitignored).
-- `Assets/TerrainSampleAssets` was trimmed to what the scenes and world builders use (~675 MB, was 1.9 GB). The deleted
-  files are still in git history, so clones only get smaller if history is rewritten (team decision, not done).
+- `Assets/TerrainSampleAssets` (Unity's free Terrain Sample Asset Pack, ~1.9 GB) is kept whole on purpose: the brushes,
+  heightmaps and extra plants are for future worlds. Deleted assets can be restored from history with
+  `git checkout <commit> -- <path>`; slimming clones would need a history rewrite (team decision, not done).
 - Before deleting assets, run `SimFlakeTools.ReportUnusedAssets -check "Assets/<folder>,..." -out unused.txt`. It follows
   dependencies from everything SimFlake uses (scenes, Robots, Worlds, Scripts, Resources...) plus the files the builders
   load by path (`PathLoadedAssets()`; add to it when a builder or `tools/` script loads something new by path).
