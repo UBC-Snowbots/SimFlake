@@ -142,7 +142,7 @@ and sensors, and save it as (or into) the prefab under `Assets/Robots/`.
 
 ## Checking your work (Claude can run all of this headless)
 Other `-executeMethod` entry points in `SimFlakeTools`: `CheckMissingRefs` (opens every scene, logs missing scripts/prefabs
-and broken references, exit 1 if any; run it after moving or deleting assets), `UpgradeScenes [-dryrun]` (scene migration), and
+and broken references, exit 1 if any; run it after moving or deleting assets), `UpgradeScenes [-dryrun]` (scene migration), `ReportUnusedAssets` (see Housekeeping), and
 `TestUrdfImport -urdf Assets/<copy>/x.urdf -prefab Assets/<copy>/x.prefab` (run it on a throwaway copy of a description
 package without .meta files, then delete the copy).
 ```bash
@@ -182,5 +182,9 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 
 ## Housekeeping
 - `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `Builds/` are local only (gitignored).
-- `Assets/TerrainSampleAssets` is ~1.9 GB of the ~2.3 GB repo. Trimming unused parts would make cloning much faster
-  (not done yet: check which scenes use it first).
+- `Assets/TerrainSampleAssets` was trimmed to what the scenes and world builders use (~675 MB, was 1.9 GB). The deleted
+  files are still in git history, so clones only get smaller if history is rewritten (team decision, not done).
+- Before deleting assets, run `SimFlakeTools.ReportUnusedAssets -check "Assets/<folder>,..." -out unused.txt`. It follows
+  dependencies from everything SimFlake uses (scenes, Robots, Worlds, Scripts, Resources...) plus the files the builders
+  load by path (`PathLoadedAssets()`; add to it when a builder or `tools/` script loads something new by path).
+  Delete each file together with its `.meta`, then run `CheckMissingRefs` and the builders.
