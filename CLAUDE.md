@@ -88,7 +88,7 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 ## Folder layout (`rover_sim/Assets`)
 ```
-Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages)
+Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
 Scenes/        scenes (TaskWorlds/ for competition-style worlds)
 Worlds/        per-world data: Badlands/ and ChassisPlayground/Generated/ are builder output (wiped on rebuild),
@@ -114,6 +114,23 @@ the GPS origin/debug text, CameraSwapper's cameras. Physics (masses, joint limit
 to a new world, drag the prefab in. In SampleScene the old lidar/camera objects outside the rover are disabled
 (the prefab's own sensors publish those topics). Rename or move prefabs inside Unity (F2) so the `.meta` follows;
 scenes find them by GUID, and the scene instances keep their own name (`chassis_24`).
+
+`Assets/Robots/Chassis/mini_rover.prefab` is the mini rover, generated from RoverFlake2's `rover_description/urdf/mini_rover.urdf`
+(copy in `Robots/Descriptions/mini_rover/`, layout `<urdf dir>/rover_description/meshes/...` so `package://` paths resolve
+headless) by `Editor/MiniRoverBuilder.cs` (menu `SimFlake > Build Mini Rover Prefab`, or `-executeMethod
+SimFlake.EditorTools.MiniRoverBuilder.BuildFromCommandLine`). A rebuild overwrites the prefab, including sensor moves saved in it.
+It uses chassis_2024's topics and frame ids, so don't put both rovers in one scene. Things the builder does on purpose:
+- Sensors are `SensorBlock`s under `base_link/Sensors`: a coloured box with a collider (the lidar sees it) and a floating label
+  (drawn on top, hidden from sensor cameras). The sensor script sits on the block's object, so dragging the block moves the sensor.
+  LiDAR, IMU and GPS (the antenna, `GPS2_Link`; the receiver board is dropped) come from the URDF; the camera is added.
+- The URDF zero pose is not a standing pose (front wheels ~15 cm above the bogie wheels). The builder rotates the rockers
+  (~17 deg) and bogies until all six wheels are level; that becomes the joint zero.
+- `RockerDifferential` couples the rockers (right = -left) with stiff drives; PhysX has no mimic joint.
+- `RobotPhysicsSetup` raises the root articulation's solver iterations at runtime (not serializable; with the default 6/1
+  the wheel drives stalled against ground friction) and ignores self-collisions.
+- Wheels collide as smooth cylinders fitted to the 45 mm tread (VHACD hulls snagged). `MiniRoverWheel.physicMaterial`
+  (0.35, Minimum combine) caps grip: the bogie pivot is higher (14 cm) than half the bogie wheel spacing (12.7 cm), so at
+  friction ~0.5 skid turns flip the bogies onto their limits and roll the rover. `turnSlipFactor` 2.2 matches IMU yaw on CustomDirt.
 
 Adding a robot (new chassis, arm revision...): import the URDF (see Importing URDFs), add the controller and sensors,
 and save it as a new prefab next to the others (`Robots/Chassis/chassis_<year>.prefab`, `Robots/Arm/...`). Copy sensor
