@@ -24,8 +24,6 @@ namespace SimFlake.EditorTools
         const string PrefabPath = "Assets/Robots/Chassis/mini_rover.prefab";
         const string BlockMatPath = "Assets/Materials/SensorBlock.mat";
         const string LabelMatPath = "Assets/Materials/SensorLabelOverlay.mat";
-        const string WheelMeshPath = "Assets/Robots/Descriptions/mini_rover/wheel_tread_collider.asset";
-        const string WheelPhysicsPath = "Assets/Materials/MiniRoverWheel.physicMaterial";
         const string ReferenceChassis = "Assets/Robots/Chassis/chassis_2024.prefab";
 
         // Same order/names as chassis_2024's MotorController (= /motor_commands order).
@@ -55,6 +53,7 @@ namespace SimFlake.EditorTools
 
         public static bool Build()
         {
+            DrivetrainSetup.EnsureAssets();
             var settings = new Unity.Robotics.UrdfImporter.ImportSettings
             {
                 chosenAxis = Unity.Robotics.UrdfImporter.ImportSettings.axisType.yAxis,
@@ -131,19 +130,11 @@ namespace SimFlake.EditorTools
             jpg.enabled = false; // same as the scenes (team choice); enable for a JPEG feed
 
             // ---------- drive ----------
-            var wheelMesh = EnsureCylinderMesh();
-            var wheelPhysics = EnsureWheelPhysics();
+            var wheelMesh = DrivetrainSetup.CylinderMesh();
             var wheels = new[] { "WFL_Link", "WML_Link", "WBL_Link", "WFR_Link", "WMR_Link", "WBR_Link" }
                 .Select(n => Find(n).GetComponent<ArticulationBody>()).ToArray();
-            foreach (var w in wheels)
-            {
-                var d = w.xDrive;
-                // Torque limit ~ a small gearmotor (N·m). chassis_2024 uses 50, which here flips the 70 g bogies
-                // onto their limits when a skid turn starts. Rolling/scrub needs ~0.4 N·m per wheel; 30 deg climb ~0.4.
-                d.stiffness = 0; d.damping = 1000f; d.forceLimit = 3f;
-                w.xDrive = d;
-                SmoothWheelCollider(w, wheelMesh, wheelPhysics);
-            }
+            // Smooth tread cylinders (VHACD hulls of the grousered wheel are faceted and stalled skid turns).
+            foreach (var w in wheels) DrivetrainSetup.ApplyWheelSpec(w, DrivetrainSetup.MiniRoverWheel, wheelMesh);
 
             float refAxisSign = ReferenceForwardAxisSign();
             var slots = new ArticulationBody[6];
@@ -178,6 +169,8 @@ namespace SimFlake.EditorTools
             so.FindProperty("turnSlipFactor").doubleValue = 2.2;
             so.ApplyModifiedPropertiesWithoutUndo();
 
+            // Motor model (36PG-3429-100-EN gearmotors) on every wheel, HUD on the root.
+            DrivetrainSetup.AttachDrivetrain(robot, wheels, DrivetrainSetup.MiniMotor, DrivetrainSetup.MiniRoverWheel);
             robot.AddComponent<RobotPhysicsSetup>();
             var diff = robot.AddComponent<RockerDifferential>();
             diff.leftRocker = Find("RockerL_Link").GetComponent<ArticulationBody>();
@@ -271,66 +264,6 @@ namespace SimFlake.EditorTools
                 if (Math.Sign(fm) == Math.Sign(flo)) { lo = m; flo = fm; } else hi = m;
             }
             return 0.5f * (lo + hi);
-        }
-
-        // VHACD hulls of the grousered wheel are faceted and catch on the ground (skid turns stalled the drives).
-        // Replace them with one smooth convex cylinder fitted to the tread (radius and width from the visual mesh).
-        static void SmoothWheelCollider(ArticulationBody w, Mesh cylinder, PhysicMaterial physics)
-        {
-            Vector3 axis = (w.anchorRotation * Vector3.right).normalized;            // wheel-local joint axis
-            Vector3 pivot = w.anchorPosition;
-            var verts = w.GetComponentsInChildren<MeshFilter>()
-                         .SelectMany(f => f.sharedMesh.vertices.Select(v => w.transform.InverseTransformPoint(f.transform.TransformPoint(v)) - pivot))
-                         .ToArray();
-            float rMax = verts.Max(v => Vector3.ProjectOnPlane(v, axis).magnitude);
-            var tread = verts.Where(v => Vector3.ProjectOnPlane(v, axis).magnitude > 0.9f * rMax).Select(v => Vector3.Dot(v, axis)).ToArray();
-            float a0 = tread.Min(), a1 = tread.Max();
-
-            foreach (var c in w.GetComponentsInChildren<Collider>(true)) UnityEngine.Object.DestroyImmediate(c);
-            var go = new GameObject("TreadCollider");
-            go.transform.SetParent(w.transform, false);
-            go.transform.localPosition = pivot + axis * (0.5f * (a0 + a1));
-            go.transform.localRotation = Quaternion.FromToRotation(Vector3.up, axis);
-            go.transform.localScale = new Vector3(2 * rMax, a1 - a0, 2 * rMax);   // unit cylinder: radius 0.5, height 1
-            var mc = go.AddComponent<MeshCollider>();
-            mc.sharedMesh = cylinder; mc.convex = true; mc.sharedMaterial = physics;
-            Debug.Log($"[MiniRover] {w.name} tread collider r {rMax:F4} width {a1 - a0:F4}");
-        }
-
-        // Grip cap. The bogie pivot sits 14 cm above the ground but only 12.7 cm from each bogie wheel, so skid-steer
-        // traction tips the bogies over ("wheelie") once friction gets near ~0.5: in-place turns flipped them onto
-        // their limits and rolled the rover. Minimum combine: the terrain can be slipperier, never grippier.
-        static PhysicMaterial EnsureWheelPhysics()
-        {
-            var m = AssetDatabase.LoadAssetAtPath<PhysicMaterial>(WheelPhysicsPath);
-            if (m != null) return m;
-            m = new PhysicMaterial("MiniRoverWheel") { dynamicFriction = 0.35f, staticFriction = 0.35f, frictionCombine = PhysicMaterialCombine.Minimum };
-            AssetDatabase.CreateAsset(m, WheelPhysicsPath);
-            return m;
-        }
-
-        static Mesh EnsureCylinderMesh()
-        {
-            var m = AssetDatabase.LoadAssetAtPath<Mesh>(WheelMeshPath);
-            if (m != null) return m;
-            const int n = 32;
-            var v = new List<Vector3>(); var tris = new List<int>();
-            for (int i = 0; i < n; i++)
-            {
-                float t = 2 * Mathf.PI * i / n;
-                v.Add(new Vector3(0.5f * Mathf.Cos(t), -0.5f, 0.5f * Mathf.Sin(t)));
-                v.Add(new Vector3(0.5f * Mathf.Cos(t), 0.5f, 0.5f * Mathf.Sin(t)));
-            }
-            for (int i = 0; i < n; i++)
-            {
-                int a = 2 * i, b = 2 * ((i + 1) % n);
-                tris.AddRange(new[] { a, a + 1, b, b, a + 1, b + 1 });
-                if (i > 0 && i < n - 1) { tris.AddRange(new[] { 0, b, a }); tris.AddRange(new[] { 1, a + 1, b + 1 }); }
-            }
-            m = new Mesh { name = "wheel_tread_collider", vertices = v.ToArray(), triangles = tris.ToArray() };
-            m.RecalculateNormals(); m.RecalculateBounds();
-            AssetDatabase.CreateAsset(m, WheelMeshPath);
-            return m;
         }
 
         static Vector3 WheelCentre(ArticulationBody w)

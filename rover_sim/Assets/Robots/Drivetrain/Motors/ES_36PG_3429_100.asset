@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4a8856a088140d9a8f98e49776ab270, type: 3}
+  m_Name: ES_36PG_3429_100
+  m_EditorClassIdentifier: 
+  notes: "mini_rover drive: E-S Motor 36PG-3429-100-EN, 12 V brushed, 100:1 planetary,
+    encoder.\nRetailer spec (RobotShop): no-load 95 rpm / <450 mA, rated 15 kg\xB7cm
+    @ 47 rpm / <2.5 A, stall 25 kg\xB7cm (2.45 N\xB7m) / <5 A.\nMotor-side values
+    are DERIVED from those output figures with an ASSUMED 70 % gear efficiency (stall
+    2.45/(100x0.7) = 0.035 N\xB7m, kt = 0.035/5 = 7 mN\xB7m/A, R = 12 V/5 A = 2.4
+    \u03A9). ESTIMATES: thermal values (none published; a generic 34 mm can), gearhead
+    limit 3 N\xB7m, controller current limit 5 A, acceleration (firmware unknown)."
+  nominalVoltage: 12
+  noLoadSpeedRpm: 9500
+  noLoadCurrent: 0.45
+  stallTorque: 0.035
+  torqueConstant: 0.007
+  terminalResistance: 2.4
+  nominalCurrent: 2.5
+  rotorInertia: 25
+  gearRatio: 100
+  gearEfficiency: 0.7
+  gearheadMaxTorque: 3
+  gearheadInertia: 2
+  thermalResistanceWinding: 6
+  thermalResistanceHousing: 12
+  windingTimeConstant: 15
+  motorTimeConstant: 600
+  maxWindingTemperature: 125
+  currentLimit: 5
+  supplyVoltage: 12
+  maxWheelAcceleration: 30
+  speedLoopGain: 2

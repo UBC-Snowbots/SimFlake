@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4a8856a088140d9a8f98e49776ab270, type: 3}
+  m_Name: Maxon_ECXFL42M_GPX42_26
+  m_EditorClassIdentifier: 
+  notes: "chassis_2024 drive: maxon ECXFL42M KL A HTQ 24V + GPX42 C 26:1 (part B84441BAF7EF,
+    datasheet 06.05.2026).\nMotor/gearhead values are from the datasheet. ESTIMATES:
+    currentLimit 20 A (controller peak, unknown), maxWheelAcceleration 50 rad/s\xB2
+    (RoverFlake2 drive_control MAX_ACCEL_RADS), speedLoopGain."
+  nominalVoltage: 24
+  noLoadSpeedRpm: 8050
+  noLoadCurrent: 0.363
+  stallTorque: 1.11
+  torqueConstant: 0.0282
+  terminalResistance: 0.233
+  nominalCurrent: 7.31
+  rotorInertia: 86.2
+  gearRatio: 26
+  gearEfficiency: 0.81
+  gearheadMaxTorque: 11.3
+  gearheadInertia: 15
+  thermalResistanceWinding: 3.04
+  thermalResistanceHousing: 1.66
+  windingTimeConstant: 20.2
+  motorTimeConstant: 92.3
+  maxWindingTemperature: 155
+  currentLimit: 20
+  supplyVoltage: 24
+  maxWheelAcceleration: 50
+  speedLoopGain: 40

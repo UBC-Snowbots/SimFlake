@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 03d72325327ce692bbed7c091e146c8b, type: 3}
+  m_Name: Chassis2024Wheel
+  m_EditorClassIdentifier: 
+  notes: "chassis_2024 wheel. Size measured from the imported mesh (radius/width 0). Tread friction 1.0 with Multiply, so the ground material's friction applies as-is. Sphere collider: the mesh cylinder jittered on the ground (25 % contact loss, 0.5 g vibration at 5 ms steps)."
+  radius: 0
+  width: 0
+  shape: 3
+  grouserCount: 12
+  grouserHeight: 0.01
+  material: {fileID: 13400000, guid: 93feb38f6afb2b828b26a37d0f65c853, type: 2}
+  mass: 0.9
+  rollingResistanceScale: 1

@@ -72,10 +72,10 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 | Topic | Type | Script |
 |---|---|---|
-| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`: skid-steer, real m/s and rad/s |
+| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`: skid-steer, real m/s and rad/s. Wheels stop 0.5 s after the last command (like the real drivers), so publish continuously |
 | `/motor_commands` (sub) | std_msgs/Float64MultiArray | `MotorController`: 6 raw wheel targets, deg/s |
 | `/odom` | nav_msgs/Odometry | `MotorController`: wheel odometry, `odom` -> `base_link` |
-| `/wheel_joint_states` | sensor_msgs/JointState | `MotorController` |
+| `/wheel_joint_states` | sensor_msgs/JointState | `MotorController`: position, velocity, effort = wheel torque (N·m) |
 | `/imu/data` | sensor_msgs/Imu | `ImuSensor` (on `chassis_link`) |
 | `/gps/fix` | sensor_msgs/NavSatFix | `LocationStuff` (`GPS` child of `chassis_link`): origin 49, -123 (per-scene override); 1 Unity unit = 1 m; +z north |
 | `/scan` | sensor_msgs/LaserScan | `HorizontalLidarScanner`: 10 Hz, CCW, +inf = no hit |
@@ -88,9 +88,10 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 ## Folder layout (`rover_sim/Assets`)
 ```
-Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages)
+Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages),
+               Drivetrain/ (Motors/, Wheels/, Grounds/ spec assets, see Drive physics)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
-Scenes/        scenes (TaskWorlds/ for competition-style worlds)
+Scenes/        scenes (TaskWorlds/ for competition-style worlds, Tests/DriveTest = drivetrain test bench)
 Worlds/        per-world data: Badlands/ and ChassisPlayground/Generated/ are builder output (wiped on rebuild),
                <Scene>/Terrain.asset are hand-made terrains, Skies/ the sky materials
 Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Sensors/, Environment/ (sky, ArUco), Tools/ (cameras,
@@ -128,9 +129,11 @@ It uses chassis_2024's topics and frame ids, so don't put both rovers in one sce
 - `RockerDifferential` couples the rockers (right = -left) with stiff drives; PhysX has no mimic joint.
 - `RobotPhysicsSetup` raises the root articulation's solver iterations at runtime (not serializable; with the default 6/1
   the wheel drives stalled against ground friction) and ignores self-collisions.
-- Wheels collide as smooth cylinders fitted to the 45 mm tread (VHACD hulls snagged). `MiniRoverWheel.physicMaterial`
+- Wheels and motors come from the drivetrain model (see Drive physics): `MiniRoverWheel` spec (sphere tread colliders;
+  VHACD hulls snagged) and the `ES_36PG_3429_100` motor. `MiniRoverWheel.physicMaterial`
   (0.35, Minimum combine) caps grip: the bogie pivot is higher (14 cm) than half the bogie wheel spacing (12.7 cm), so at
   friction ~0.5 skid turns flip the bogies onto their limits and roll the rover. `turnSlipFactor` 2.2 matches IMU yaw on CustomDirt.
+  (That cap was found before improved patch friction was on; with it on, higher grip may now be fine. Untested.)
 
 Adding a robot (new chassis, arm revision...): import the URDF (see Importing URDFs), add the controller and sensors,
 and save it as a new prefab next to the others (`Robots/Chassis/chassis_<year>.prefab`, `Robots/Arm/...`). Copy sensor
@@ -158,8 +161,8 @@ The `SimFlake` menu has submenus: `World Generation` (world/feature builders), `
 then build/test tools at the top level. Put new `[MenuItem]`s in the matching submenu (priorities 100s / 200s / 300s).
 New files in `Assets/` only show up in an open editor after it refreshes (focus the window, or Ctrl+R).
 
-`TaskWorlds/BadlandsTraversal` is a URC/CIRC-style traversal world with no robot yet (a `FreeFlyCamera` for looking
-around: right-drag + WASD/QE). The map is 3x3 terrain tiles of 500 m (1.5 km). Only the centre tile (-250..250) is
+`TaskWorlds/BadlandsTraversal` is a URC/CIRC-style traversal world with a mini_rover instance and a `FreeFlyCamera` for looking
+around (right-drag + WASD/QE). The map is 3x3 terrain tiles of 500 m (1.5 km). Only the centre tile (-250..250) is
 detailed; the outer tiles are coarse and rise into mountains at the edge. Contents: control station + rover start box at
 (-20, -191); a 12 m escarpment with three ways up (west ramp ~15 deg, slot canyon ~4 m wide with rubble, the builder logs the narrowest gap, east talus ~22 deg + boulders);
 a dry wash with 2 m banks and two fords; hoodoo field, boulder field, three buttes, a 3.5 m ledge band, a crater, dunes,
@@ -177,6 +180,57 @@ Waypoint ArUco posts are linked instances of `Prefabs/Props/ArucoMarker_75cm.pre
 waypoint; marker textures only appear in Play mode). The builder places them by the bottom of the prefab's `Post` child.
 Shrubs are terrain trees with capsule colliders (they block the rover and show on lidar); grass has no collision.
 A rebuild rewrites ~40 MB of generated assets with new GUIDs, so commit rebuilds sparingly.
+
+## Drive physics (drivetrain model)
+Code in `Scripts/Robot/Drivetrain/`, data in `Assets/Robots/Drivetrain/`, setup in `Editor/DrivetrainSetup.cs`.
+- **`DriveWheel`** (on each wheel ArticulationBody) = motor + gearhead + speed controller. Every physics step it sets the
+  joint's velocity drive (type **Force**, damping = P gain) and its force limit to what the motor can give right now:
+  DC curve (stall torque falling to 0 at no-load speed), controller current limit (derated by a two-node winding
+  temperature model), gearhead efficiency and rating. The setpoint ramps at the controller's acceleration limit.
+  It also reads the wheel's collisions: normal load, contact point, slip ratio/angle, ground `GroundSpec`, and applies
+  rolling resistance (coefficient x load x radius, against the spin). `MotorController` keeps its topics and just sets
+  `DriveWheel.TargetSpeed`; wheels without a DriveWheel use the old ideal velocity drive.
+- **Specs (ScriptableObjects, edit in the inspector):** `DriveMotorSpec` (`Motors/Maxon_ECXFL42M_GPX42_26` for chassis_2024
+  from the maxon datasheet; `Motors/ES_36PG_3429_100` for mini_rover from the retailer spec, motor side derived; the
+  notes field says which values are estimates), `WheelSpec` (collider shape/size, tread PhysicMaterial, rolling-resistance
+  scale), `GroundSpec` per ground PhysicMaterial (rolling resistance now; Bekker/Wong soil values for later), all listed in
+  `Resources/GroundSpecs.asset`. Unknown materials use its default.
+- **Applying:** `SimFlake > Drivetrain > ...` or `-executeMethod SimFlake.EditorTools.DrivetrainSetup.SetUpFromCommandLine`
+  (creates missing spec assets, sets the physics settings below, puts colliders/DriveWheels/HUD on both rover prefabs
+  in place, sets their calibrated `turnSlipFactor`, rebuilds the test scene). `MiniRoverBuilder` does the same on a rebuild.
+  To try a different wheel or motor: duplicate a spec, point the rover at it (`ApplyToPrefab`), run the bench.
+- **Physics settings:** fixed timestep 5 ms (200 Hz; a rover-only scene still runs ~18x faster than real time), TGS
+  solver, improved patch friction (the default patch friction exceeded Coulomb: the mini climbed 30 deg on 0.35 friction).
+  `CustomDirt` is 0.6/0.5 (it was 0.03 static / 0.4), `Asphalt` 0.8/0.7. Tread material `RoverTread` = 1.0, Multiply.
+- **HUD:** F8 in Play shows per-wheel setpoint, speed, torque, current, winding temperature, load, slip, ground.
+- **Test bench:** `tools/drive_bench.sh [--setup] [-- <flags>]` builds `Scenes/Tests/DriveTest` and runs it headless (no ROS):
+  per rover x ground, accel/cruise, top speed, point turn, arc, command timeout, 10/20/30 deg climbs + hold, perf. Table
+  + JSON. Flags for experiments (no rebuild): `--drive-test-trace` (per-wheel state), `--fixed-dt`, `--turnslip`,
+  `--speed-gain`, `--integral-time`, `--legacy-drive`, `--solver-iterations p,v`, `--contact-offset`, `--bogie-damping`,
+  `--ground-shape box|terrain`, `--drive-test-rovers/-grounds/-only`. Open the scene and press Play to watch it.
+- **Masses:** chassis_2024 is 35 kg without the arm (team numbers: wheels 0.9 kg each, < 50 kg with the ~15 kg arm; the
+  URDF said 86 kg). `DrivetrainSetup.Chassis2024MassKg` scales the chassis + bogies (URDF proportions, not measured) to
+  fit; wheel mass comes from the `Chassis2024Wheel` spec. The arm is a bench payload (`chassis_2024_arm`, +15 kg on the root).
+- **Results now (CustomDirt, 35 kg / 50 kg with arm):** 0.125 s to 63 % of 1 m/s, top 3.8 m/s (no-load 3.87), climbs
+  30 deg at 0.72 / 0.30 m/s (with the arm the windings reach ~107 °C on the way up) and holds, body vibration
+  0.17 m/s² RMS, odom error < 0.5 %. `turnSlipFactor` 2.1 (2.05-2.15 match a point turn for 35-50 kg).
+  mini_rover top 0.65 m/s, climbs 20 deg, stalls on 30 deg (0.35 friction cap). On asphalt with the arm chassis_2024
+  binds in gentle arcs (high-grip skid steer, outer front wheel lifts): real skid steers do that too, but check against the rover.
+- **Why it is built this way (measured, don't undo):**
+  - Unity's `Velocity`/`Target` drive types compute their own gains and ignore damping (chassis_2024's imported wheels were
+    `Velocity`: bang-bang ±max torque). Revolute drive damping is N·m per **rad/s** (target velocity is in deg/s).
+  - Convex mesh tread cylinders jitter on the ground at small timesteps (chassis_2024: wheels unloaded 25-30 % of steps,
+    0.5 g vertical vibration; worse at smaller dt; 32 vs 120 sides makes no difference). Sphere colliders roll cleanly.
+    The cost: a sphere is 2 x radius wide, so side contact with rocks/walls starts ~75 mm early on chassis_2024.
+  - Speed loop is P only by default: with rigid (no tyre compliance) contacts, six wheel integrators fight each other
+    (3-4 N·m per wheel of internal torque on flat ground). P only still holds 30 deg slopes (< 1 cm creep).
+  - `ArticulationBody.velocity` reads several % high with TGS (1.05 m/s reported at 0.99 true). Angular velocity is fine.
+    Use position differences for linear speed (DriveWheel, HUD, bench do; the IMU already did).
+- **Next tiers (not done):** a wheel-soil model (Bekker/Wong traction-slip and sinkage per `GroundSpec`) would set the tread
+  friction to ~0 and apply its own forces in `DriveWheel.ApplyGroundForces` from `Contact` (load, slip, point, normal).
+  Ruts: subscribe to `DriveWheel.Stepped` (contact point + load + slip each step) and lower the TerrainData heights where
+  `GroundSpec.deformable`. Unity 2022's contact modification (`Physics.ContactModifyEvent`) could also give soft
+  contacts (tyre/soil compliance), which would allow PI speed loops and the exact-width cylinder again.
 
 ## Importing URDFs
 Package `com.unity.robotics.urdf-importer` v0.5.2 (git URL in `Packages/manifest.json`, downloads automatically).
@@ -196,6 +250,7 @@ $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorT
    -scenes Assets/Scenes/TaskWorlds/WaypointTask.unity -out /tmp/simbuild/rover_sim.x86_64 -logFile build.log
 /tmp/simbuild/rover_sim.x86_64 -batchmode -nographics --rosbridge-url ws://127.0.0.1:9090 -logFile player.log &   # physics/sensors without a GPU window
 python3 tools/sim_check.py --drive          # topic rates + drives the rover and checks odom/GPS/IMU agree
+tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics
 ```
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.
@@ -203,9 +258,10 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 ## Gotchas found during the Jazzy migration
 - rosbridge's JSON (ujson) escapes `/` as `\/`. Envelope strings go through `RosJson.Unquote`; JsonUtility handles it in bodies.
 - The imported wheel joints had velocity-drive damping 0, which produces no torque. `MotorController` sets
-  `wheelDriveDamping` when it's 0.
-- Skid steer slips: `turnSlipFactor` (2.3) scales the effective track width for both commands and odometry.
-  It was tuned so a commanded 0.5 rad/s turn roughly matches the IMU. Retune against the real rover if needed.
+  `wheelDriveDamping` when it's 0 (legacy path, wheels without a `DriveWheel`).
+- Skid steer slips: `turnSlipFactor` scales the effective track width for both commands and odometry. Calibrated on
+  CustomDirt with the drive bench so a commanded 0.5 rad/s point turn matches: chassis_2024 2.1 (was 2.3 before the
+  drivetrain model and the 86 -> 35 kg mass fix), mini_rover 2.2. Retune against the real rover if needed.
 - Saving a scene writes every serialized field. Changing a default in code does NOT change existing scenes; use
   `SimFlakeTools.UpgradeScenes` (or the inspector).
 - GPU readback row order: on OpenGL (Unity's default on Linux) camera RenderTexture readback is top-row-first.

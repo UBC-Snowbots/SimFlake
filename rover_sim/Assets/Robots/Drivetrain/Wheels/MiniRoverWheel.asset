@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 03d72325327ce692bbed7c091e146c8b, type: 3}
+  m_Name: MiniRoverWheel
+  m_EditorClassIdentifier: 
+  notes: "mini_rover grousered 3D-printed wheel, collides as a sphere of the tread radius (VHACD hulls snagged; the mesh cylinder rolls with some contact jitter). Friction capped at 0.35 (Minimum combine): the bogie pivot is higher than half the bogie wheel spacing, so skid turns at ~0.5 friction flip the bogies."
+  radius: 0
+  width: 0
+  shape: 3
+  grouserCount: 12
+  grouserHeight: 0.01
+  material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
+  mass: 0
+  rollingResistanceScale: 1.3

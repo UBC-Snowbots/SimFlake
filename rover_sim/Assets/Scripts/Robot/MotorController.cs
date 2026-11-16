@@ -10,7 +10,12 @@ using UnityEngine;
 ///   /motor_commands  std_msgs/Float64MultiArray   6 raw wheel joint targets [deg/s], order = wheelJointNames
 /// Publishes:
 ///   /odom                nav_msgs/Odometry      dead-reckoned from wheel joint speeds (frame odom -> base_link)
-///   /wheel_joint_states  sensor_msgs/JointState wheel positions [rad] and velocities [rad/s]
+///   /wheel_joint_states  sensor_msgs/JointState wheel positions [rad], velocities [rad/s], effort = wheel torque [N·m]
+///
+/// Wheels with a <see cref="DriveWheel"/> get their speed target through it (motor + gearhead + controller model).
+/// Wheels without one fall back to the old ideal velocity drive.
+/// Like the real drivers (Phidget failsafe / mini rover firmware), wheels stop if no command arrives for
+/// <see cref="commandTimeout"/> seconds, so publish cmd_vel continuously (teleop and nav2 do).
 /// </summary>
 public class MotorController : MonoBehaviour
 {
@@ -52,6 +57,10 @@ public class MotorController : MonoBehaviour
     [Tooltip("Skid-steer turning needs more wheel speed difference than the geometric track suggests. 1 = ideal.")]
     [SerializeField] private double turnSlipFactor = 2.3;
 
+    [Header("Safety")]
+    [Tooltip("Stop the wheels if no /cmd_vel or /motor_commands arrives for this long (s). The real rovers do this at 0.5 s. 0 = never.")]
+    [SerializeField] private float commandTimeout = 0.5f;
+
     [Header("Odometry")]
     [SerializeField] private bool publishOdometry = true;
     [SerializeField] private string odomTopic = "/odom";
@@ -68,6 +77,18 @@ public class MotorController : MonoBehaviour
     double odomX, odomY, odomYaw;
     double lastV, lastW;
     float odomTimer;
+    readonly DriveWheel[] driveWheels = new DriveWheel[motorCount];
+    float lastCommandTime = float.NegativeInfinity;
+    bool stoppedByTimeout = true;
+
+    /// <summary>Wheel-odometry pose in the odom frame (x forward at start, y left, yaw CCW), m / rad.</summary>
+    public double OdomX => odomX;
+    public double OdomY => odomY;
+    public double OdomYaw => odomYaw;
+    public double WheelRadius => wheel_radius_meters;
+    public double TrackWidth => track_width_meters;
+    public double TurnSlipFactor { get => turnSlipFactor; set => turnSlipFactor = value; }
+    public DriveWheel[] DriveWheels => driveWheels;
 
     void Start()
     {
@@ -83,6 +104,9 @@ public class MotorController : MonoBehaviour
                 Debug.LogError($"[MotorController] Wheel '{wheelJointNames[i]}' not found (needs an ArticulationBody)");
                 continue;
             }
+            driveWheels[i] = wheelJoints[i].GetComponent<DriveWheel>();
+            if (driveWheels[i] != null) continue;   // the motor model owns the drive
+            // Legacy ideal velocity drive.
             wheelJoints[i].jointFriction = 1;
             wheelJoints[i].angularDamping = 1;
             var drive = wheelJoints[i].xDrive;
@@ -90,7 +114,9 @@ public class MotorController : MonoBehaviour
         }
 
         if (autoMeasureGeometry) MeasureGeometry();
-        if (wheelJoints[0] != null)
+        if (driveWheels[0] != null && driveWheels[0].motor != null)
+            Debug.Log($"[MotorController] motor model {driveWheels[0].motor.name}: {driveWheels[0].motor.Summary}");
+        else if (wheelJoints[0] != null)
         {
             var d = wheelJoints[0].xDrive;
             Debug.Log($"[MotorController] wheel drive: type {wheelJoints[0].jointType}, stiffness {d.stiffness}, damping {d.damping}, forceLimit {d.forceLimit}");
@@ -146,6 +172,7 @@ public class MotorController : MonoBehaviour
             Debug.LogWarning($"[MotorController] Expected {motorCount} motor commands, got {msg.data?.Length ?? 0}.");
             return;
         }
+        lastCommandTime = Time.time; stoppedByTimeout = false;
         for (int i = 0; i < motorCount; i++) SetJointTarget(i, (float)msg.data[i]);
     }
 
@@ -153,6 +180,7 @@ public class MotorController : MonoBehaviour
     {
         double v = msg.linear.x;   // m/s forward
         double w = msg.angular.z;  // rad/s, positive = turn left (counter-clockwise from above)
+        lastCommandTime = Time.time; stoppedByTimeout = false;
         double half = track_width_meters * turnSlipFactor / 2.0;
         double left = (v - w * half) / wheel_radius_meters;   // wheel rad/s
         double right = (v + w * half) / wheel_radius_meters;
@@ -165,6 +193,7 @@ public class MotorController : MonoBehaviour
 
     void SetJointTarget(int i, float degPerSec)
     {
+        if (driveWheels[i] != null) { driveWheels[i].TargetSpeed = degPerSec * Mathf.Deg2Rad; return; }
         var joint = wheelJoints[i];
         if (joint == null) return;
         var drive = joint.xDrive;
@@ -174,6 +203,11 @@ public class MotorController : MonoBehaviour
 
     void FixedUpdate()
     {
+        if (!stoppedByTimeout && commandTimeout > 0 && Time.time - lastCommandTime > commandTimeout)
+        {
+            stoppedByTimeout = true;
+            for (int i = 0; i < motorCount; i++) SetJointTarget(i, 0);
+        }
         if (!publishOdometry) return;
 
         // Average forward wheel speed per side (rad/s).
@@ -245,6 +279,7 @@ public class MotorController : MonoBehaviour
             name = new string[motorCount],
             position = new double[motorCount],
             velocity = new double[motorCount],
+            effort = new double[motorCount],
         };
         for (int i = 0; i < motorCount; i++)
         {
@@ -253,6 +288,7 @@ public class MotorController : MonoBehaviour
             if (j == null || j.jointPosition.dofCount == 0) continue;
             js.position[i] = j.jointPosition[0] * SideSign(i);
             js.velocity[i] = j.jointVelocity[0] * SideSign(i);
+            if (driveWheels[i] != null) js.effort[i] = driveWheels[i].OutputTorque * SideSign(i);
         }
         wheelStatePub.Publish(js);
     }
