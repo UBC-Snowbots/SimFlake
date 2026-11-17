@@ -38,6 +38,8 @@ public class DriveTestRunner : MonoBehaviour
 
     public RoverCase[] rovers = new RoverCase[0];
     public PhysicMaterial[] grounds = new PhysicMaterial[0];
+    [Tooltip("Soils for the wheel-soil model: each is run on a soil terrain (flat + 10/20/30 deg slopes in the heightmap)")]
+    public GroundSpec[] soils = new GroundSpec[0];
     public float[] slopes = { 10, 20, 30 };
     [Tooltip("Speed-up in the editor (headless default is 20)")]
     public float timeScale = 1f;
@@ -80,7 +82,11 @@ public class DriveTestRunner : MonoBehaviour
         if (roverFilter != null) foreach (var r in rovers) r.enabled = roverFilter.Contains(r.label);
         var groundFilter = Arg("--drive-test-grounds")?.Split(',');
         if (groundFilter != null) grounds = grounds.Where(g => g != null && groundFilter.Contains(g.name)).ToArray();
+        // --soils LooseSand,Hardpack (part of the spec name) or --soils none
+        var soilFilter = Arg("--soils")?.Split(',');
+        if (soilFilter != null) soils = soils.Where(g => g != null && soilFilter.Any(f => g.name.IndexOf(f, StringComparison.OrdinalIgnoreCase) >= 0)).ToArray();
         trace = args.Contains("--drive-test-trace");
+        DriveWheel.DebugSettle = trace;
         legacyDrive = args.Contains("--legacy-drive");
         wheelCollider = Arg("--wheel-collider");
         if (Arg("--ground-shape") == "box") terrainGround = false;
@@ -108,8 +114,8 @@ public class DriveTestRunner : MonoBehaviour
     {
         if (terrainGround)
         {
-            var td = new TerrainData { heightmapResolution = 257 };
-            td.size = new Vector3(600, 10, 600);
+            var td = new TerrainData { heightmapResolution = 1025 };
+            td.size = new Vector3(600, TerrainHeight, 600);
             ground = Terrain.CreateTerrainGameObject(td);
             ground.name = "Test Ground (terrain)";
             ground.transform.position = new Vector3(-300, 0, -300);
@@ -138,6 +144,39 @@ public class DriveTestRunner : MonoBehaviour
 
     Vector3 RampStart(int i) => new Vector3(60 + 20 * i, 0, 0);
 
+    const float TerrainHeight = 20f;
+    SoilWorld soilWorld;
+    SoilTerrain soilTerrain;
+
+    /// <summary>Turn the arena into a soil terrain of one soil: the box ramps go, the same slopes are cut into the heightmap.</summary>
+    void SetSoil(GroundSpec spec)
+    {
+        var terrain = ground.GetComponent<Terrain>();
+        if (terrain == null) { Debug.LogError("[DriveTest] soils need the terrain ground"); return; }
+        if (soilWorld == null)
+        {
+            foreach (var g in arena) if (g != ground) g.SetActive(false);
+            var td = terrain.terrainData;
+            int res = td.heightmapResolution;
+            var h = new float[res, res];
+            float step = td.size.x / (res - 1);
+            for (int zi = 0; zi < res; zi++)
+            for (int xi = 0; xi < res; xi++)
+            {
+                float x = ground.transform.position.x + xi * step, z = ground.transform.position.z + zi * step;
+                for (int i = 0; i < slopes.Length; i++)
+                    if (Mathf.Abs(x - RampStart(i).x) <= RampWidth * 0.5f + 0.3f)
+                        h[zi, xi] = Mathf.Tan(slopes[i] * Mathf.Deg2Rad) * Mathf.Clamp(z, 0, RampLength) / TerrainHeight;
+            }
+            td.SetHeights(0, 0, h);
+            soilWorld = new GameObject("Soil").AddComponent<SoilWorld>();
+            soilTerrain = ground.AddComponent<SoilTerrain>();
+        }
+        soilTerrain.defaultSpec = spec;
+        soilTerrain.Reinit();
+        soilWorld.ClearRuts();
+    }
+
     void SetGround(PhysicMaterial m)
     {
         foreach (var g in arena) g.GetComponent<Collider>().sharedMaterial = m;
@@ -155,6 +194,14 @@ public class DriveTestRunner : MonoBehaviour
             {
                 SetGround(g);
                 yield return RunRover(rc, g);
+            }
+        foreach (var rc in rovers.Where(r => r.enabled && r.prefab != null))
+            foreach (var soil in soils.Where(x => x != null))
+            {
+                SetSoil(soil);
+                yield return null;
+                Debug.Log($"[DriveTest] soil {soil.name}, quality {soilWorld.quality} ({soilWorld.Current.cell * 100:0.#} cm cells, {soilWorld.Current.nTheta}x{soilWorld.Current.nY} elements), dt {Time.fixedDeltaTime * 1000:F1} ms");
+                yield return RunRover(rc, new PhysicMaterial(soil.name.Replace("Utah_", "")));
             }
         Debug.Log($"[DriveTest] done in {Time.realtimeSinceStartup - wall0:F0} s wall time");
         PrintTable();
@@ -274,7 +321,9 @@ public class DriveTestRunner : MonoBehaviour
         var sb = new StringBuilder($"[Trace] {r.go.name} {what} t={Time.fixedTime:F2} v={r.Speed:F3} yawrate={r.YawRateCcw:F3}\n");
         foreach (var w in r.wheels)
             sb.Append($"   {w.name,-24} set {w.SetpointSpeed,7:F2} spd {w.Speed,7:F2} tq {w.OutputTorque,7:F2} avail {w.TorqueAvailable,6:F2} I {w.MotorCurrent,5:F1} " +
-                      $"load {w.Contact.normalForce,6:F0} vlong {w.Contact.longitudinalVelocity,6:F3} surf {w.Contact.surfaceSpeed,6:F3} slip {w.Contact.slipRatio,6:F3} rr {w.RollingResistanceTorque,5:F2}\n");
+                      $"load {w.Contact.normalForce,6:F0} vlong {w.Contact.longitudinalVelocity,6:F3} surf {w.Contact.surfaceSpeed,6:F3} slip {w.Contact.slipRatio,6:F3} rr {w.RollingResistanceTorque,5:F2}" +
+                      $" low {(w.HubWorld.y - w.Radius) * 1000,5:F1}mm" +
+                      (w.Soil.handled ? $" | sink {w.Soil.sinkage * 1000,5:F1} mm spring {w.Soil.spring * 1000,4:F1} scale {w.Soil.stiffnessScale,4:F2} trac {w.Soil.traction,6:F1}/{w.Soil.tractionLimit,5:F1} patch {w.Soil.patchLength * 1000,3:F0}x{w.Soil.patchWidth * 1000,2:F0} el {w.Soil.elements} nrm {Mathf.Atan2(w.Soil.normal.z, w.Soil.normal.y) * Mathf.Rad2Deg,5:F1} F {w.Soil.force.y,5:F1} {w.Soil.force.z,5:F1}" : "") + "\n");
         Debug.Log(sb.ToString());
     }
 
@@ -313,7 +362,7 @@ public class DriveTestRunner : MonoBehaviour
     // Per-step electrical stats over all wheels.
     class Stats
     {
-        public float peakCurrent, peakTemp, sumAbsTorque, sumSlip, sumLoad; public int n, nSlip, nAir;
+        public float peakCurrent, peakTemp, sumAbsTorque, sumSlip, sumLoad, sumSink, maxSink; public int n, nSlip, nAir, nSoil;
         public void Add(Rover r)
         {
             foreach (var w in r.wheels)
@@ -323,6 +372,7 @@ public class DriveTestRunner : MonoBehaviour
                 sumAbsTorque += Mathf.Abs(w.OutputTorque); n++;
                 if (w.Contact.grounded && w.Contact.normalForce > 0.5f) { sumSlip += Mathf.Abs(w.Contact.slipRatio); sumLoad += w.Contact.normalForce; nSlip++; }
                 else nAir++;
+                if (w.Soil.grounded) { sumSink += w.Soil.sinkage; maxSink = Mathf.Max(maxSink, w.Soil.sinkage); nSoil++; }
             }
         }
         public void Into(Dictionary<string, object> d)
@@ -331,6 +381,7 @@ public class DriveTestRunner : MonoBehaviour
             d["peak_current_A"] = peakCurrent; d["peak_winding_C"] = peakTemp; d["mean_wheel_torque_Nm"] = sumAbsTorque / n;
             d["contact_loss_pct"] = 100f * nAir / n;
             if (nSlip > 0) { d["mean_abs_slip"] = sumSlip / nSlip; d["mean_wheel_load_N"] = sumLoad / nSlip; }
+            if (nSoil > 0) { d["mean_sink_mm"] = 1000f * sumSink / nSoil; d["max_sink_mm"] = 1000f * maxSink; }
         }
     }
 
@@ -492,7 +543,7 @@ public class DriveTestRunner : MonoBehaviour
                 {
                     // Hold: command zero on the slope; does it creep back?
                     float p0 = Progress();
-                    yield return Drive(r, 0, 0, 3f, null);
+                    yield return Drive(r, 0, 0, 3f, _ => Trace(r, $"hold p={Progress():F3}"));
                     d["hold_creep_m"] = p0 - Progress();
                 }
                 Despawn(r);
@@ -502,6 +553,12 @@ public class DriveTestRunner : MonoBehaviour
         var perf = NewResult(rc, g, "perf");
         perf["sim_s"] = sim; perf["wall_s"] = wall; perf["realtime_factor"] = sim / Mathf.Max(wall, 1e-3f);
         perf["fixed_dt_ms"] = Time.fixedDeltaTime * 1000f;
+        if (SoilWorld.SoilSteps > 0)
+        {
+            perf["soil_ms_per_step"] = (float)(SoilWorld.SoilTicks * 1e3 / System.Diagnostics.Stopwatch.Frequency / SoilWorld.SoilSteps);
+            if (soilWorld != null && soilWorld.Field != null) perf["soil_tiles"] = soilWorld.Field.TileCount;
+            SoilWorld.SoilTicks = 0; SoilWorld.SoilSteps = 0;
+        }
     }
 
     // ---------------------------------------------------------------- output

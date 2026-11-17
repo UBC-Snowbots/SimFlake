@@ -19,11 +19,11 @@ using UnityEngine;
 ///   - normal load, contact point/normal, ground collider and its <see cref="GroundSpec"/>;
 ///   - longitudinal slip ratio and slip angle;
 ///   - rolling resistance: a torque against the wheel's rotation = coefficient x load x radius.
-/// Friction itself is still PhysX Coulomb friction from the PhysicMaterials.
+/// On colliders (rocks, ramps, plain terrains) friction is PhysX Coulomb friction from the PhysicMaterials.
 ///
-/// Next tiers hook in here: a wheel-soil force model (Bekker/Wong) would set the tread's friction to 0 and apply its
-/// own traction/lateral/sinkage forces in <see cref="ApplyGroundForces"/> from <see cref="Contact"/>; ruts can
-/// subscribe to <see cref="Stepped"/> (contact point, load and slip every physics step).
+/// On soil (a terrain with a <see cref="SoilTerrain"/>, in a scene with a <see cref="SoilWorld"/>) the wheel ignores
+/// the terrain's collider and <see cref="WheelSoilModel"/> computes the contact instead: tyre squash, sinkage, traction
+/// from the tread, ruts. Its result is in <see cref="Soil"/>; <see cref="Contact"/> is filled either way.
 /// </summary>
 [RequireComponent(typeof(ArticulationBody))]
 public class DriveWheel : MonoBehaviour
@@ -37,6 +37,16 @@ public class DriveWheel : MonoBehaviour
     [Tooltip("Balance the wheel like a real one: centre of mass on the axle and the inertia's symmetry axis along the axle. " +
              "Imported URDF inertials can be off/tilted, which makes the wheel wobble: it shakes the rover and hops at speed.")]
     public bool balanceWheel = true;
+    [Tooltip("At start the motors stay off (wheels roll freely) and, on soil, the tyres have almost no grip, until all the " +
+             "rover's wheels carry load (at most this many seconds), so the suspension can settle. Otherwise a rover spawned " +
+             "with wheels in the air (chassis_2024's prefab pose) stays like that on high-grip ground: the speed controller " +
+             "and sideways friction lock a rocker-bogie solid. On a slope the rover slides a little during this time.")]
+    public float startupCoast = 1.5f;
+    [Header("Tyre position (baked from the mesh with the tread)")]
+    [Tooltip("m along the axle from the joint to the middle of the tread")]
+    public float tyreOffset;
+    [Tooltip("This wheel's mesh is the mirror image of the one the tread was baked from")]
+    public bool treadMirror;
 
     /// <summary>Speed target from the drive controller, rad/s in joint space.</summary>
     [NonSerialized] public float TargetSpeed;
@@ -54,6 +64,9 @@ public class DriveWheel : MonoBehaviour
     public float Radius { get; private set; }            // m
     public float RollingResistanceTorque { get; private set; }
     public WheelContact Contact;
+    /// <summary>Last result of the wheel-soil model (handled = false when this wheel is not on soil).</summary>
+    public WheelSoilModel.Result Soil;
+    public WheelSoilModel SoilModel => soilModel;
 
     /// <summary>After each physics-step update of a wheel (contact data is fresh). For ruts, logging, wheel-soil models.</summary>
     public static event Action<DriveWheel> Stepped;
@@ -64,7 +77,24 @@ public class DriveWheel : MonoBehaviour
 
     ArticulationBody body, parentBody;
     Transform robotRoot;
-    Vector3 axisLocal;
+    Vector3 axisLocal, e1Local, e2Local;
+    WheelSoilModel soilModel;
+    SoilWorld soilWorld;
+    int soilVersion = -1;
+    Collider[] myColliders;
+    float kinStamp = -1, soilStamp = -1, startTime = -1;
+    bool settled;
+    public static bool DebugSettle;
+    DriveWheel[] siblings;
+
+    bool AllGrounded()
+    {
+        if (siblings == null) siblings = transform.root.GetComponentsInChildren<DriveWheel>();
+        foreach (var w in siblings) if (w != null && !(w.Contact.grounded && w.Contact.normalForce > 1f)) return false;
+        return true;
+    }
+    bool soilBegun;
+    readonly System.Collections.Generic.List<Collider> ignoredTerrains = new System.Collections.Generic.List<Collider>();
     float integral;   // N·m, PI integral term
     Vector3 lastHub; float lastHubTime = -1; Vector3 hubVelocity;
     float housingTemperature;
@@ -87,6 +117,7 @@ public class DriveWheel : MonoBehaviour
         for (var b = parentBody; b != null; b = b.transform.parent != null ? b.transform.parent.GetComponentInParent<ArticulationBody>() : null)
             robotRoot = b.transform;   // the articulation root (moving body): its forward is the rover's forward
         axisLocal = (body.anchorRotation * Vector3.right).normalized;
+        WheelSoilModel.Frame(axisLocal, out e1Local, out e2Local);
         WindingTemperature = housingTemperature = ambientTemperature;
     }
 
@@ -171,15 +202,35 @@ public class DriveWheel : MonoBehaviour
     {
         if (body.jointVelocity.dofCount == 0) return;
         float dt = Time.fixedDeltaTime;
-        Speed = body.jointVelocity[0];
-        if (body.driveForce.dofCount > 0) OutputTorque = body.driveForce[0];
-
-        // Hub velocity from positions: ArticulationBody linear velocities read several % high with the TGS solver
-        // (measured: 1.05 m/s reported at 0.99 m/s true). Angular velocities are fine.
-        Vector3 hub = HubWorld;
-        hubVelocity = lastHubTime >= 0 && Time.fixedTime > lastHubTime ? (hub - lastHub) / (Time.fixedTime - lastHubTime) : Vector3.zero;
-        lastHub = hub; lastHubTime = Time.fixedTime;
+        Kinematics();
         UpdateContact(dt);
+        // Soil: normally SoilWorld has already stepped all wheels together this step (in parallel); if not, do it here.
+        if (soilStamp != Time.fixedTime)
+        {
+            if (SoilBegin()) SoilCompute(dt);
+            SoilEnd();
+        }
+        if (Soil.grounded)
+        {
+            var k = new WheelContact { grounded = true, point = Soil.point, normal = Soil.normal, normalForce = Soil.load, groundSpec = Soil.ground };
+            FillSlip(ref k, Vector3.zero);
+            Contact = k;
+        }
+
+        if (startTime < 0) startTime = Time.fixedTime;
+        if (!settled && (Time.fixedTime - startTime >= startupCoast || (Time.fixedTime - startTime > 0.15f && AllGrounded())))
+        {
+            settled = true;
+            if (DebugSettle) Debug.Log($"[DriveWheel] {name}: motors on after {Time.fixedTime - startTime:F2} s (coast {startupCoast}, siblings {siblings?.Length}, loads {(siblings != null ? string.Join(" ", System.Array.ConvertAll(siblings, w => w.Contact.normalForce.ToString("F0"))) : "-")})");
+        }
+        if (!settled)
+        {
+            SetpointSpeed = Speed; integral = 0; TorqueAvailable = 0; Saturated = false;
+            SetDrive(0, 0, 0);
+            ApplyGroundForces(dt);
+            Stepped?.Invoke(this);
+            return;
+        }
 
         if (motor == null)
         {
@@ -219,6 +270,22 @@ public class DriveWheel : MonoBehaviour
         SetDrive(SetpointSpeed + integral / kp, kp, tOut);
         ApplyGroundForces(dt);
         Stepped?.Invoke(this);
+    }
+
+    // Joint speed and hub velocity, once per physics step (whoever asks first).
+    void Kinematics()
+    {
+        if (kinStamp == Time.fixedTime) return;
+        kinStamp = Time.fixedTime;
+        Speed = body.jointVelocity[0];
+        if (body.driveForce.dofCount > 0) OutputTorque = body.driveForce[0];
+        // Hub velocity from positions: ArticulationBody linear velocities read several % high with the TGS solver
+        // (measured: 1.05 m/s reported at 0.99 m/s true). Angular velocities are fine.
+        Vector3 hub = HubWorld;
+        hubVelocity = lastHubTime >= 0 && Time.fixedTime > lastHubTime ? (hub - lastHub) / (Time.fixedTime - lastHubTime) : Vector3.zero;
+        // a jump (teleport, respawn) is not a velocity
+        if ((hub - lastHub).sqrMagnitude > 0.25f) { hubVelocity = Vector3.zero; soilModel?.Reset(); }
+        lastHub = hub; lastHubTime = Time.fixedTime;
     }
 
     void SetDrive(float targetRad, float gainPerRad, float limit)
@@ -296,32 +363,99 @@ public class DriveWheel : MonoBehaviour
             k.normalForce = cImpulse / dt;
             k.ground = cGround;
             k.groundSpec = cGround != null ? GroundSpecTable.Lookup(cGround.sharedMaterial) : null;
-
-            Vector3 axis = AxisWorld, hub = HubWorld;
             Vector3 groundVel = cGroundRb != null ? cGroundRb.GetPointVelocity(k.point)
                               : cGroundAb != null ? cGroundAb.GetPointVelocity(k.point) : Vector3.zero;
-            Vector3 hubVel = hubVelocity - groundVel;
-            Vector3 omegaRel = body.angularVelocity - (parentBody != null ? parentBody.angularVelocity : Vector3.zero);
-            Vector3 fwd = Vector3.Cross(axis, k.normal).normalized;
-            if (Vector3.Dot(fwd, robotRoot.forward) < 0) fwd = -fwd;
-            Vector3 side = Vector3.Cross(k.normal, fwd);
-            k.forward = fwd;
-            k.longitudinalVelocity = Vector3.Dot(hubVel, fwd);
-            k.lateralVelocity = Vector3.Dot(hubVel, side);
-            // Tread speed relative to the hub (ω x r points backwards at the contact when rolling forwards).
-            k.surfaceSpeed = -Vector3.Dot(Vector3.Cross(omegaRel, k.point - hub), fwd);
-            float denom = Mathf.Max(Mathf.Max(Mathf.Abs(k.surfaceSpeed), Mathf.Abs(k.longitudinalVelocity)), 0.05f);
-            k.slipRatio = (k.surfaceSpeed - k.longitudinalVelocity) / denom;   // + = spinning (traction), - = skidding (braking)
-            k.slipAngle = Mathf.Atan2(k.lateralVelocity, Mathf.Max(Mathf.Abs(k.longitudinalVelocity), 0.05f)) * Mathf.Rad2Deg;
+            FillSlip(ref k, groundVel);
         }
         Contact = k;
         cCount = 0;
     }
 
+    void FillSlip(ref WheelContact k, Vector3 groundVel)
+    {
+        Vector3 axis = AxisWorld, hub = HubWorld;
+        Vector3 hubVel = hubVelocity - groundVel;
+        Vector3 omegaRel = body.angularVelocity - (parentBody != null ? parentBody.angularVelocity : Vector3.zero);
+        Vector3 fwd = Vector3.Cross(axis, k.normal).normalized;
+        if (Vector3.Dot(fwd, robotRoot.forward) < 0) fwd = -fwd;
+        Vector3 side = Vector3.Cross(k.normal, fwd);
+        k.forward = fwd;
+        k.longitudinalVelocity = Vector3.Dot(hubVel, fwd);
+        k.lateralVelocity = Vector3.Dot(hubVel, side);
+        // Tread speed relative to the hub (ω x r points backwards at the contact when rolling forwards).
+        k.surfaceSpeed = -Vector3.Dot(Vector3.Cross(omegaRel, k.point - hub), fwd);
+        float denom = Mathf.Max(Mathf.Max(Mathf.Abs(k.surfaceSpeed), Mathf.Abs(k.longitudinalVelocity)), 0.05f);
+        k.slipRatio = (k.surfaceSpeed - k.longitudinalVelocity) / denom;   // + = spinning (traction), - = skidding (braking)
+        k.slipAngle = Mathf.Atan2(k.lateralVelocity, Mathf.Max(Mathf.Abs(k.longitudinalVelocity), 0.05f)) * Mathf.Rad2Deg;
+    }
+
+    // ---------------- soil ----------------
+
+    /// <summary>(Re)connect to the scene's SoilWorld: build the tyre model for its quality preset and stop colliding with soil terrains.</summary>
+    void ConnectSoil()
+    {
+        soilWorld = SoilWorld.Instance;
+        soilVersion = soilWorld != null ? soilWorld.Version : -1;
+        if (myColliders == null) myColliders = GetComponentsInChildren<Collider>();
+        foreach (var t in ignoredTerrains) if (t != null) foreach (var c in myColliders) if (c != null) Physics.IgnoreCollision(c, t, false);
+        ignoredTerrains.Clear();
+        Soil = default;
+        if (soilWorld == null || !soilWorld.Active) { soilModel = null; return; }
+        if (soilModel == null) soilModel = new WheelSoilModel();
+        soilModel.axialCentre = tyreOffset; soilModel.mirror = treadMirror;
+        soilModel.Configure(wheel, Radius, wheel != null && wheel.width > 0 ? wheel.width : Radius * 0.7f, soilWorld.WheelSettings);
+        foreach (var b in soilWorld.Bases)
+            if (b is SoilTerrain st && st.Collider != null)
+            {
+                foreach (var c in myColliders) if (c != null) Physics.IgnoreCollision(c, st.Collider, true);
+                ignoredTerrains.Add(st.Collider);
+            }
+        soilWorld.Register(this);
+    }
+
+    /// <summary>Soil step, phase 1 (main thread): pose + copy of the ground under the wheel. False = nothing to compute.</summary>
+    public bool SoilBegin()
+    {
+        soilBegun = false;
+        if (!isActiveAndEnabled || body == null || body.jointVelocity.dofCount == 0) return false;
+        var w = SoilWorld.Instance;
+        if (w != soilWorld || (w != null && (w.Version != soilVersion || (w.Active && ignoredTerrains.Count != w.TerrainCount)))) ConnectSoil();
+        if (soilModel == null) return false;
+        Kinematics();
+        Vector3 hub = HubWorld;
+        var soil = soilWorld.FindBase(hub.x, hub.z);
+        if (soil == null) return false;
+        Quaternion r = transform.rotation;
+        var pose = new WheelSoilModel.Pose
+        {
+            hub = hub, axis = r * axisLocal, e1 = r * e1Local, e2 = r * e2Local,
+            hubVelocity = hubVelocity, angularVelocity = body.angularVelocity, spin = Speed, stabilityMass = body.mass,
+        };
+        soilBegun = true;
+        soilModel.gripFactor = settled ? 1f : 0.05f;   // settling at start: let the wheels find their place
+        return soilModel.Begin(soilWorld.Field, soil, pose);
+    }
+
+    /// <summary>Phase 2 (any thread): the contact itself. Only after SoilBegin returned true.</summary>
+    public void SoilCompute(float dt) => soilModel.Compute(dt);
+
+    /// <summary>Phase 3 (main thread): write ruts back, apply the forces to the wheel.</summary>
+    public void SoilEnd()
+    {
+        soilStamp = Time.fixedTime;
+        if (!soilBegun || soilModel == null) { Soil = default; return; }
+        soilBegun = false;
+        Soil = soilModel.End();
+        if (!Soil.grounded) return;
+        Vector3 com = body.worldCenterOfMass;
+        body.AddForce(Soil.force);
+        body.AddTorque(Soil.torque + Vector3.Cross(HubWorld - com, Soil.force));
+    }
+
     void ApplyGroundForces(float dt)
     {
         RollingResistanceTorque = 0;
-        if (!rollingResistance || !Contact.grounded || Contact.groundSpec == null) return;
+        if (!rollingResistance || !Contact.grounded || Contact.groundSpec == null || Soil.grounded) return;   // soil: comes out of the model
         // Rolling resistance acts against the wheel's rotation relative to its carrier; fades in over ~5 cm/s so a
         // parked wheel doesn't jitter.
         Vector3 axis = AxisWorld;

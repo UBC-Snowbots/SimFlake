@@ -37,6 +37,25 @@ public class WheelSpec : ScriptableObject
     [Header("Rolling resistance")]
     [Tooltip("Scales the ground's rolling-resistance coefficient (GroundSpec). Wide/soft tyres < 1, narrow rigid wheels > 1.")]
     public float rollingResistanceScale = 1f;
+
+    [Header("Tyre (wheel-soil model, used on soil terrains)")]
+    [Tooltip("Shore A hardness of the tyre rubber. Mold Max 40 silicone = 40. Softer = bigger contact patch, more grip on rock.")]
+    [Range(5, 95)] public float shoreA = 40f;
+    [Tooltip("m, rubber between the tread surface (lug base) and the rigid hub")]
+    public float rubberThickness = 0.008f;
+    [Tooltip("Loss factor (tan delta) of the rubber: the part of the squash energy lost as heat each turn. Rolling resistance " +
+             "on hard ground comes from it. Silicone 0.05-0.15, natural rubber 0.1-0.3.")]
+    public float lossTangent = 0.1f;
+    [Tooltip("Scales the ground's rubber friction for this compound (1 = the GroundSpec value). Silicone on dusty rock grips " +
+             "less than natural rubber or polyurethane: try 0.8-1.2.")]
+    public float gripScale = 1f;
+    [Tooltip("Rubber grips a little less at high contact pressure: friction x (pressure / 100 kPa)^exponent. 0 = Coulomb, -0.1 typical.")]
+    public float gripPressureExponent = -0.1f;
+    [Tooltip("The tread, measured from the wheel's STL: SimFlake > Drivetrain > Bake Tread From Mesh. Empty = smooth cylinder of radius x width.")]
+    public TreadData tread = new TreadData();
+
+    /// <summary>Young's modulus of the rubber (Pa) from Shore A (Gent's relation).</summary>
+    public float YoungsModulus => 0.0981f * (56f + 7.62336f * shoreA) / (0.137505f * (254f - 2.54f * shoreA)) * 1e6f;
 }
 
 /// <summary>

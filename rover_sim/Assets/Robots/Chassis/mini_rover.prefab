@@ -36,7 +36,7 @@ Transform:
   m_Children:
   - {fileID: 3892701677308766547}
   - {fileID: 78534307541445034}
-  - {fileID: 244329946563397687}
+  - {fileID: 2282029505623347808}
   m_Father: {fileID: 8732336161691701963}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4457427598883379497
@@ -170,6 +170,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: 0.022999978
+  treadMirror: 0
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}
@@ -670,59 +673,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   geometryType: 3
---- !u!1 &1287864515045363804
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7961195081770904225}
-  - component: {fileID: 5688274146588670016}
-  m_Layer: 0
-  m_Name: TreadCollider
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7961195081770904225
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1287864515045363804}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6074774693307999801}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &5688274146588670016
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1287864515045363804}
-  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.065500066
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1400544600927768093
 GameObject:
   m_ObjectHideFlags: 0
@@ -1091,6 +1041,59 @@ MonoBehaviour:
   topic: /camera/image/compressed
   hideFromScreen: 1
   maxInFlight: 2
+--- !u!1 &1762706892432864318
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4569918394501678105}
+  - component: {fileID: 1671492765678925068}
+  m_Layer: 0
+  m_Name: TreadCollider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4569918394501678105
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762706892432864318}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.022499993, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4889934126186695652}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &1671492765678925068
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1762706892432864318}
+  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.065500066
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1821224127267832393
 GameObject:
   m_ObjectHideFlags: 0
@@ -1137,59 +1140,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   geometryType: 3
---- !u!1 &1953090044384274921
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 5946998904089861867}
-  - component: {fileID: 7500285580549283381}
-  m_Layer: 0
-  m_Name: TreadCollider
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &5946998904089861867
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1953090044384274921}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.022499993, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 2851340641506568306}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &7500285580549283381
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1953090044384274921}
-  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.06550006
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2153300060112185249
 GameObject:
   m_ObjectHideFlags: 0
@@ -1460,7 +1410,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 46398bc5d6905ad429a6d2d973afe002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &2533982958711146523
+--- !u!1 &2657729290942885793
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1468,8 +1418,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1368071028514903878}
-  - component: {fileID: 6187740336877473917}
+  - component: {fileID: 2896179912082455704}
+  - component: {fileID: 2641826868550382745}
   m_Layer: 0
   m_Name: TreadCollider
   m_TagString: Untagged
@@ -1477,28 +1427,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1368071028514903878
+--- !u!4 &2896179912082455704
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2533982958711146523}
+  m_GameObject: {fileID: 2657729290942885793}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0.022499993, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4889934126186695652}
+  m_Father: {fileID: 2851340641506568306}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &6187740336877473917
+--- !u!135 &2641826868550382745
 SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2533982958711146523}
+  m_GameObject: {fileID: 2657729290942885793}
   m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
@@ -1511,7 +1461,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.065500066
+  m_Radius: 0.06550006
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2811599571467049630
 GameObject:
@@ -1559,6 +1509,59 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   geometryType: 3
+--- !u!1 &2971130903990859060
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8400318457235308977}
+  - component: {fileID: 4502401191990741545}
+  m_Layer: 0
+  m_Name: TreadCollider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8400318457235308977
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2971130903990859060}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3883705787995539658}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &4502401191990741545
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2971130903990859060}
+  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.06550006
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &2999507031976085766
 GameObject:
   m_ObjectHideFlags: 0
@@ -2446,7 +2449,7 @@ Transform:
   m_Children:
   - {fileID: 4777611516611672169}
   - {fileID: 2011884863373174195}
-  - {fileID: 8383787710537204717}
+  - {fileID: 469956995738483193}
   m_Father: {fileID: 1431602736998843665}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5985481572836046708
@@ -2580,6 +2583,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: -0.022659983
+  treadMirror: 1
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}
@@ -2593,6 +2599,59 @@ MonoBehaviour:
     surfaceSpeed: 0
     slipRatio: 0
     slipAngle: 0
+--- !u!1 &4906037765523625114
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5887368513594806252}
+  - component: {fileID: 1956182428153073015}
+  m_Layer: 0
+  m_Name: TreadCollider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5887368513594806252
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4906037765523625114}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6074774693307999801}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &1956182428153073015
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4906037765523625114}
+  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.065500066
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &4964181006617581911
 GameObject:
   m_ObjectHideFlags: 0
@@ -2720,7 +2779,7 @@ Transform:
   m_Children:
   - {fileID: 4280028238150428656}
   - {fileID: 7245118087113724779}
-  - {fileID: 5946998904089861867}
+  - {fileID: 2896179912082455704}
   m_Father: {fileID: 1431602736998843665}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1975472012803477439
@@ -2854,6 +2913,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: -0.022659983
+  treadMirror: 1
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}
@@ -3224,7 +3286,7 @@ Transform:
   m_Children:
   - {fileID: 3036329127732714254}
   - {fileID: 8265546788635838376}
-  - {fileID: 1368071028514903878}
+  - {fileID: 4569918394501678105}
   m_Father: {fileID: 8420584465718027761}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &5779487550173213124
@@ -3358,6 +3420,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: -0.022659983
+  treadMirror: 1
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}
@@ -3862,7 +3927,7 @@ MonoBehaviour:
   _SortingLayer: 0
   _SortingLayerID: 0
   _SortingOrder: 0
---- !u!1 &6908144100631289794
+--- !u!1 &6915392508515549589
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -3870,8 +3935,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 244329946563397687}
-  - component: {fileID: 1319909138383927129}
+  - component: {fileID: 469956995738483193}
+  - component: {fileID: 5949737102118153905}
   m_Layer: 0
   m_Name: TreadCollider
   m_TagString: Untagged
@@ -3879,28 +3944,28 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &244329946563397687
+--- !u!4 &469956995738483193
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6908144100631289794}
+  m_GameObject: {fileID: 6915392508515549589}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
+  m_LocalPosition: {x: -0.022499993, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 4905407297288115629}
+  m_Father: {fileID: 6049829303080142421}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &1319909138383927129
+--- !u!135 &5949737102118153905
 SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6908144100631289794}
+  m_GameObject: {fileID: 6915392508515549589}
   m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
@@ -4006,59 +4071,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   geometryType: 3
---- !u!1 &7073754163435462380
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8383787710537204717}
-  - component: {fileID: 6693878111117393507}
-  m_Layer: 0
-  m_Name: TreadCollider
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8383787710537204717
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7073754163435462380}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.022499993, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 6049829303080142421}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &6693878111117393507
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7073754163435462380}
-  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.06550006
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7213327595586711533
 GameObject:
   m_ObjectHideFlags: 0
@@ -4104,59 +4116,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 46398bc5d6905ad429a6d2d973afe002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &7240165669907746269
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 6707435489018944592}
-  - component: {fileID: 1873415184265165160}
-  m_Layer: 0
-  m_Name: TreadCollider
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &6707435489018944592
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7240165669907746269}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 3883705787995539658}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!135 &1873415184265165160
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7240165669907746269}
-  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Radius: 0.06550006
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7320570949144584995
 GameObject:
   m_ObjectHideFlags: 0
@@ -5048,6 +5007,59 @@ MonoBehaviour:
   inertiaTensor: {x: 0.0143369995, y: 0.019035999, z: 0.032935}
   inertiaTensorRotation: {x: -0.5000005, y: 0.49999937, z: 0.49999943, w: 0.5000008}
   inertialAxisRotation: {x: 0, y: 0, z: 0, w: 1}
+--- !u!1 &8031683341336147879
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2282029505623347808}
+  - component: {fileID: 8981117636796119188}
+  m_Layer: 0
+  m_Name: TreadCollider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2282029505623347808
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8031683341336147879}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.022499993, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 4905407297288115629}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!135 &8981117636796119188
+SphereCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8031683341336147879}
+  m_Material: {fileID: 13400000, guid: 6386dcbf0a871c5b5ac4d99fa8f4b490, type: 2}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Radius: 0.06550006
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &8040374178390477131
 GameObject:
   m_ObjectHideFlags: 0
@@ -5648,7 +5660,7 @@ Transform:
   m_Children:
   - {fileID: 5380921715082151072}
   - {fileID: 6692480810098546463}
-  - {fileID: 7961195081770904225}
+  - {fileID: 5887368513594806252}
   m_Father: {fileID: 8562596149084728839}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8196243036282051905
@@ -5782,6 +5794,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: 0.022999976
+  treadMirror: 0
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}
@@ -6060,7 +6075,7 @@ Transform:
   m_Children:
   - {fileID: 4149011376180004885}
   - {fileID: 4785811111675643558}
-  - {fileID: 6707435489018944592}
+  - {fileID: 8400318457235308977}
   m_Father: {fileID: 8562596149084728839}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &8149137281701855177
@@ -6194,6 +6209,9 @@ MonoBehaviour:
   thermalModel: 1
   rollingResistance: 1
   balanceWheel: 1
+  startupCoast: 1.5
+  tyreOffset: 0.022999978
+  treadMirror: 0
   Contact:
     grounded: 0
     point: {x: 0, y: 0, z: 0}

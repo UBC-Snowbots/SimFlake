@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65ea568e61f89b673935602891860b8c, type: 3}
+  m_Name: Utah_BentoniteCrust
+  m_EditorClassIdentifier: 
+  notes: 'Dry bentonite clay hills (''popcorn'' crust over powder, Mancos/Morrison
+    badlands). Weak fluffy crust, powder underneath, holds crisp prints. Bekker values
+    are an estimate for a fluffy dry powder (a boot sinks 1-3 cm). (Wet bentonite
+    is a different, far worse soil: not modelled.)'
+  material: {fileID: 0}
+  rollingResistance: 0.1
+  kc: 2
+  kphi: 800
+  n: 0.8
+  crustStrength: 12
+  cohesion: 3
+  frictionAngle: 24
+  shearModulus: 0.008
+  rubberFriction: 0.45
+  deformable: 1
+  density: 1200
+  reposeAngle: 62
+  compaction: 0.75
+  excavation: 0.2
+  roughnessFine: 0.006
+  roughnessCoarse: 0.015
+  disturbedDarkening: 0.35

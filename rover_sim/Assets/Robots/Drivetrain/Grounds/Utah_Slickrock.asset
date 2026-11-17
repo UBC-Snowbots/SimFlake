@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65ea568e61f89b673935602891860b8c, type: 3}
+  m_Name: Utah_Slickrock
+  m_EditorClassIdentifier: 
+  notes: 'Bare sandstone (slickrock), a little dusty. Rigid: no ruts; grip is rubber
+    friction. shearModulus here is the tread rubber''s own shear give.'
+  material: {fileID: 0}
+  rollingResistance: 0.02
+  kc: 0.9
+  kphi: 1523.4
+  n: 1.1
+  crustStrength: 0
+  cohesion: 1.04
+  frictionAngle: 28
+  shearModulus: 0.002
+  rubberFriction: 0.8
+  deformable: 0
+  density: 1500
+  reposeAngle: 34
+  compaction: 0.6
+  excavation: 0.3
+  roughnessFine: 0.0015
+  roughnessCoarse: 0.02
+  disturbedDarkening: 0

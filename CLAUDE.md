@@ -91,11 +91,11 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages),
                Drivetrain/ (Motors/, Wheels/, Grounds/ spec assets, see Drive physics)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
-Scenes/        scenes (TaskWorlds/ for competition-style worlds, Tests/DriveTest = drivetrain test bench)
+Scenes/        scenes (TaskWorlds/ for competition-style worlds, Tests/DriveTest = drivetrain test bench, SoilYard = soil lanes)
 Worlds/        per-world data: Badlands/ and ChassisPlayground/Generated/ are builder output (wiped on rebuild),
                <Scene>/Terrain.asset are hand-made terrains, Skies/ the sky materials
-Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Sensors/, Environment/ (sky, ArUco), Tools/ (cameras,
-               FPS, test node), Editor/ (builders, SimFlakeTools)
+Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Soil/ (deformable ground + wheel-soil model), Sensors/,
+               Environment/ (sky, ArUco), Tools/ (cameras, FPS, test node, bench), Editor/ (builders, SimFlakeTools)
 Materials/, Shaders/, Resources/   ours
 ThirdParty/    Asset Store / downloaded packs, unchanged (HQ Rocks, klen, TerrainSampleAssets, ...)
 TextMesh Pro/  stays at the root (TMP expects it there)
@@ -104,6 +104,7 @@ Builders and `SimFlakeTools.PathLoadedAssets()` load some assets by path; grep f
 Move assets with their `.meta` (in the editor, or `AssetDatabase.MoveAsset` headless), then run `CheckMissingRefs`.
 
 ## Scenes
+`Assets/Scenes/SoilYard` (mini rover on lanes of Utah soils: ruts, sinkage, tyre tests; see Soil model),
 `Assets/Scenes/ChassisPlayground` (chassis), `ArmScene` (arm on a table), `TaskWorlds/WaypointTask` (chassis + GPS +
 lidar + cameras), `SampleScene` (older all-in-one playground). The moving body is `chassis_24/base_link/chassis_link`
 (the root ArticulationBody). `base_link` itself does not move.
@@ -180,6 +181,8 @@ Waypoint ArUco posts are linked instances of `Prefabs/Props/ArucoMarker_75cm.pre
 waypoint; marker textures only appear in Play mode). The builder places them by the bottom of the prefab's `Post` child.
 Shrubs are terrain trees with capsule colliders (they block the rover and show on lidar); grass has no collision.
 A rebuild rewrites ~40 MB of generated assets with new GUIDs, so commit rebuilds sparingly.
+The centre terrain is soil (ruts, sinkage: see Soil model). A rebuild drops that: run `SimFlake > Soil > Add Soil To Badlands`
+(`SoilYardBuilder.AddSoilToBadlands`) afterwards.
 
 ## Drive physics (drivetrain model)
 Code in `Scripts/Robot/Drivetrain/`, data in `Assets/Robots/Drivetrain/`, setup in `Editor/DrivetrainSetup.cs`.
@@ -226,11 +229,125 @@ Code in `Scripts/Robot/Drivetrain/`, data in `Assets/Robots/Drivetrain/`, setup 
     (3-4 N·m per wheel of internal torque on flat ground). P only still holds 30 deg slopes (< 1 cm creep).
   - `ArticulationBody.velocity` reads several % high with TGS (1.05 m/s reported at 0.99 true). Angular velocity is fine.
     Use position differences for linear speed (DriveWheel, HUD, bench do; the IMU already did).
-- **Next tiers (not done):** a wheel-soil model (Bekker/Wong traction-slip and sinkage per `GroundSpec`) would set the tread
-  friction to ~0 and apply its own forces in `DriveWheel.ApplyGroundForces` from `Contact` (load, slip, point, normal).
-  Ruts: subscribe to `DriveWheel.Stepped` (contact point + load + slip each step) and lower the TerrainData heights where
-  `GroundSpec.deformable`. Unity 2022's contact modification (`Physics.ContactModifyEvent`) could also give soft
-  contacts (tyre/soil compliance), which would allow PI speed loops and the exact-width cylinder again.
+- **Start-up:** for up to 1.5 s after start (until all six wheels carry load) the motors are off and, on soil, the tyres
+  have 5 % grip, so the suspension settles. `DrivetrainSetup.LevelBogies` also turns each bogie in the prefab until its two
+  wheels are level (chassis_2024's URDF zero pose had every bogie ~12 deg off, three wheels 10 cm in the air). Reason: with
+  the speed loop holding every wheel and real grip, a rocker-bogie is locked solid and stays however it was dropped.
+
+## Soil model (ruts, sinkage, tyres)
+Code in `Scripts/Soil/`, shaders `Shaders/SoilTerrain*`, setup in `Editor/SoilSetup.cs`, `TreadBaker.cs`, `SoilYardBuilder.cs`.
+On a terrain with a `SoilTerrain` component, in a scene with a `SoilWorld` (+ `SoilRenderer`) object, wheels with a
+`DriveWheel` ignore the terrain's collider and `WheelSoilModel` computes the contact instead. Everything else (chassis,
+rocks, props) still collides with the plain terrain. No SoilWorld, or quality Off = the PhysX contacts described above.
+Scenes with soil: `Scenes/SoilYard` and BadlandsTraversal's centre terrain.
+- **`WheelSoilModel`** (plain C#, per wheel, per physics step). The tread is cut into elements that turn with the wheel;
+  each has a lug-top part and a void part at their own radii (from the baked tread). For each element under the soil:
+  - normal pressure: tyre rubber as a spring layer (stiffness from Shore A and thickness) in series with the soil, which
+    gives way by Bekker's law (`p = (kc/b + kphi) z^n`) once pressure exceeds what that spot has carried (crust, or an
+    earlier wheel pass: wheels following in a rut sink less). On hard ground only lug tops touch;
+  - shear: Janosi-Hanamoto on the slip accumulated since the element touched down; strength = rubber friction, limited
+    by the soil's own strength (cohesion + pressure x tan phi), plus soil pushed by buried lug faces (passive earth
+    pressure, separately for rolling and sideways directions: this is where tread pattern matters). One ellipse for
+    traction + side slip, so skid-steer scrub comes out of it;
+  - pressure acts along the wheel radius, so rolling resistance from sinkage needs no coefficient;
+  - soil buried against the tyre's sides resists sideways sliding in a rut; rubber hysteresis (`lossTangent`) gives the
+    small rolling resistance on rock.
+  Then the grid is updated: pressed down to the tread, part of the volume (1 - `compaction`) piled beside the rut, soil dug
+  out by slipping lugs (`excavation`) thrown behind (the wheel digs in), slopes slumped to `reposeAngle`.
+- **`SoilField`**: sparse 64x64 tiles of cells (0.5-2.5 cm by preset), only where a wheel has been: deformation, highest
+  pressure carried, a "disturbed" mark. Base = terrain height (same triangle interpolation as Unity, checked to 0.02 mm)
+  + small-scale relief (`SoilNoise`, two wavelengths, amplitudes per `GroundSpec`), identical in physics and shader.
+- **`GroundSpec`** per terrain layer (`SoilTerrain.layerSpecs`, assigned by layer name in `SoilSetup.ForLayer`):
+  `Grounds/Utah_{LooseSand,Hardpack,BentoniteCrust,Gravel,Slickrock}`. Literature values for similar soils (Wong), adjusted
+  for a dry desert by judgment. **Nobody has measured the URC site or our wheels: treat every number as a starting point.**
+- **`WheelSpec` tyre fields:** `shoreA` (Mold Max 40 = 40), `rubberThickness`, `lossTangent`, `gripScale`,
+  `gripPressureExponent`, and `tread` (`TreadData`: radius over 180 angles x 16 positions across, baked from the wheel's
+  visual mesh by `TreadBaker`, which also finds where the tyre sits along the axle per wheel: `DriveWheel.tyreOffset`).
+  mini_rover's STL gives: tip radius 65.5 mm, tread 46 mm wide, 24 staggered lugs per side x 3.1 mm, 36 % land.
+  chassis_2024's STL has no tread (smooth, 101 mm wide). New tread = new STL, then `SimFlake > Drivetrain > Set Up Everything`.
+- **Quality** (`SoilWorld.quality`; F9 in Play; `--soil-quality off|low|medium|high|ultra`; changing it clears the ruts).
+  Mini rover, headless, soil cost per physics step for 6 wheels (computed on several cores, `--soil-serial` to compare):
+  | preset | cells | tyre elements | physics | ruts drawn as | soil ms/step | faster than real time |
+  |---|---|---|---|---|---|---|
+  | Low | 2.5 cm | 60x3 | 200 Hz | shading only (no tessellation, for iGPUs) | 0.15-0.18 | ~10-12x |
+  | Medium | 1.5 cm | 90x4 | 200 Hz | tessellated, coarse | 0.18-0.25 | ~9-11x |
+  | High (default) | 1 cm | 120x8 | 200 Hz | tessellated | 0.23-0.28 | ~9-10x |
+  | Ultra | 0.5 cm | 180x16 (lugs resolved, lug prints in the ruts) | 400 Hz | tessellated, fine | 0.45-0.6 | ~3x |
+  Results agree across presets within ~10 % (sand cruise 0.23-0.25 m/s, hardpack identical). Low/Medium shake more
+  (vertical accel 0.5-1.3 m/s² RMS on sand vs 0.2-0.3) because coarse ruts are bumpy for the following wheels.
+  Frame rate with graphics has not been measured; the demo screenshots were rendered on the Radeon iGPU.
+- **Rendering:** `SoilRenderer` keeps a window of the grid around the rover in a wrap-around texture (uploads only changed
+  tiles) and swaps soil terrains to `SimFlake/SoilTerrain(Tess)` at runtime (the terrain's own material is restored on
+  exit; Draw Instanced is turned off on them). Same look as Unity's terrain shader + displacement by tessellation +
+  normals from the soil height + darker disturbed soil. Materials in `Resources/` only exist so player builds include
+  the shaders. Tessellation needs the one-argument `vertex:` overload (see `SoilTerrain.cginc`).
+- **Numerics (don't undo):** forces are explicit. Real rubber on rock is far too stiff for 5 ms steps, so the tread hangs on a
+  series spring of `stabilityFactor` x wheel mass / dt² (hub sits 1-3 mm low); pressures and which tread parts touch stay
+  physical. Shear give is floored the same way. Element soil state travels with the element (lug prints can't be stored in
+  1 cm cells) and follows the slope when the element slips (without that a spinning wheel climbed any slope). Soil more than
+  20 deg behind a moving wheel only gives passive pressure (else it leans on its own spoil). Hub velocity from positions.
+  A hub jump > 0.5 m in a step is treated as a teleport.
+- **Tools:**
+  - Wheel test rig (no PhysX, seconds): `-executeMethod SimFlake.EditorTools.WheelRig.RunFromCommandLine [-wheel MiniRoverWheel]
+    [-ground Utah_LooseSand,...] [-load 13] [-slope 20] [-summary 1] [-variants "smooth:lugs=0,tall:lugs=2,soft:shore=20,wide:width=1.5"]
+    [-out x.csv]`: drawbar pull, torque, sinkage, efficiency vs slip for a wheel and changed copies of it.
+  - Bench: `tools/drive_bench.sh -- --drive-test-grounds none --soils LooseSand,Hardpack [--soil-quality high]
+    [--soil-relief 0] [--soil-stability 1] [--no-ruts]` runs the same tests on a soil terrain (slopes in the heightmap).
+  - `Scenes/SoilYard` (`SimFlake > World Generation > Build Soil Yard`): five 12 m lanes (sand, hardpack, bentonite, gravel,
+    slickrock), bumps, 15/25 deg ramps, a mini_rover. `--soil-demo <dir>` in a player (batchmode, with graphics) drives each
+    lane and saves pictures (`Tools/SoilDemo.cs`; it respawns the rover, see gotchas).
+  - HUD (F8) shows sinkage, contact patch, pressure and grip in use per wheel, and the soil preset.
+- **Results (High, 5 ms):** mini_rover (7.7 kg, ~13 N per wheel):
+  | soil | cruise at 0.3 cmd | odom over-reads | sinkage | 0.5 rad/s point turn gives | climbs |
+  |---|---|---|---|---|---|
+  | loose sand | 0.24 m/s | 22-30 % | 17-21 mm | 0.47-0.50 | 10 deg barely, not 20 |
+  | hardpack | 0.29 | 4-5 % | 2 mm (lug prints) | 0.63 | 20 deg, not 30 |
+  | bentonite crust | 0.27 | 12 % | 13 mm | 0.44 | 10 deg, not 20 |
+  | gravel | 0.26 | 16 % | 5 mm | 0.58 | 10 deg, not 20 |
+  | slickrock | 0.30 | 0.3 % | 0 | 0.85 | 30 deg |
+  Rig, 13 N: sand sinkage 18 mm (Bekker's closed form for a rigid wheel: 14 mm), peak pull 0.23 x load at 60 % slip,
+  rolling resistance 0.23 x load. chassis_2024 with arm: sand 15 mm, climbs 20 deg sand, not 30; hardpack and slickrock 30 deg.
+  `turnSlipFactor` now depends on the ground (mini: 2.2-2.3 sand, 1.75 hardpack, 1.3 slickrock; chassis_2024 1.4-1.7):
+  left at the old values, which match sand. In loose sand the mini rover sinks to within ~1 cm of its bogies' clearance.
+- **Known rough edges:** chassis_2024 on soil is less tested than the mini (on slickrock some wheels read unloaded ~13 % of
+  steps at 1 m/s; its STL has no tread). Rocks and other colliders still use the PhysX sphere, so no tyre squash or tread
+  there. The belly and rocks collide with the undeformed terrain. Only wheels deform soil. Wet soil is not modelled. Ruts
+  are not saved between runs, and only the window around the rover is drawn (the rest is kept in memory, up to 6000 tiles).
+- **Ideas not done:** the same contact model against rocks (rays instead of the height grid); PI speed loops (the shear
+  give should now allow it: test `--integral-time`); `ArticulationBody.velocity` bias; saving ruts; a tyre mesh that
+  visibly squashes; calibrating soils and `turnSlipFactor` against the real rover (drawbar pull with a luggage scale,
+  sinkage with a ruler, odometry vs GPS over 10 m are enough to pin the main numbers).
+
+### Working on the soil model (how it was built, start here)
+Read in this order: `WheelSoilModel.cs` (class comment, then `Compute`), `SoilField.cs`, `DriveWheel.SoilBegin/SoilEnd`,
+`SoilWorld.FixedUpdate` (steps all wheels: Begin on the main thread, Compute in parallel, End on the main thread).
+- **Iteration loop, fastest first.** (1) Wheel rig, ~20 s, no player build: change the model, run `WheelRig.RunFromCommandLine
+  -summary 1 -load 13 [-slope 25]`, compare flat vs slope and against Bekker's closed form
+  `z = (3W / (b (3-n) k sqrt(D)))^(2/(2n+1))`. (2) Bench, ~1-3 min: `tools/drive_bench.sh [--no-build] -- --drive-test-rovers
+  mini_rover --drive-test-grounds none --soils LooseSand --drive-test-only accel,slope [--drive-test-trace]`. The trace prints
+  per wheel: load, slip, height above ground, sinkage, spring, traction/limit, patch, contact normal angle, force. (3) Pictures:
+  build a player of `Scenes/SoilYard`, run it `-batchmode` (not `-nographics`) with `--soil-demo <dir> --soil-demo-lanes 0,1
+  --time-of-day sunset`, then look at the PNGs. Always check `build.log` for `error CS`: a failed build silently reruns the old player.
+- **How bugs were found (the pattern that worked):** when the rover and the rig disagree, reproduce it on the rig and switch
+  features off one at a time (`-relax 0`, `-nodig`, `-noaside`). When a rover result looks too good, add up the forces: total
+  traction vs weight along the slope showed the contact normal was tilted uphill. When a wheel hangs in the air, print hub
+  height and the bogie joint angle, and compare with `--soil-quality off` (PhysX).
+- **Mistakes already made, don't repeat:**
+  - Softening the rubber for stability let lug voids touch rock. Fix: physical rubber + one series spring per wheel.
+  - Stamping each cell to its lowest element made coarse presets sink more. Fix: stamp the wheel's round profile at the cell centre.
+  - Storing an element's soil level as a fixed world height: on slopes a slipping wheel pushed on soil it had left. Fix: advect by the ground slope.
+  - Spoil thrown right behind the contact, and uncapped pressure behind the wheel: the wheel leaned on its own heap.
+  - Sharp "grit" in the relief noise made heavy wheels hop at 1 m/s. Relief is now smooth (15-20 cm and 0.5-1 m).
+  - A lower clamp on the landing force scale gave 10x forces on hard landings.
+  - Changing a field default in code did nothing: the prefab kept the old value (see gotchas).
+- **Tuning knobs and what they move:** `rubberFriction` and `frictionAngle` set peak pull (max slope ~ atan of rig "DP max");
+  `kphi`, `n`, `crustStrength` set sinkage and so rolling resistance; `shearModulus` sets how much slip is needed;
+  `excavation` sets how fast a spinning wheel digs in; `SoilWorld.stabilityFactor` trades hub sag against buzz on rock.
+- **Not understood yet:** why bogies settle slowly (not at all with motors on) from a tilted pose under this model when
+  PhysX contacts settle in 0.5 s (worked around by `LevelBogies` + start-up coast); the `TeleportRoot` tumble; why a smooth
+  tyre out-pulls the lugged one above ~60 % slip on the rig (lug digging vs the soil-strength cap, may be wrong).
+- **Good next steps:** measure frame rate per preset with graphics (iGPU and RTX 3060); give chassis_2024 a treaded STL and
+  retest on slickrock; rays against rocks so tyres squash on them; calibrate against the real mini rover.
 
 ## Importing URDFs
 Package `com.unity.robotics.urdf-importer` v0.5.2 (git URL in `Packages/manifest.json`, downloads automatically).
@@ -250,7 +367,7 @@ $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorT
    -scenes Assets/Scenes/TaskWorlds/WaypointTask.unity -out /tmp/simbuild/rover_sim.x86_64 -logFile build.log
 /tmp/simbuild/rover_sim.x86_64 -batchmode -nographics --rosbridge-url ws://127.0.0.1:9090 -logFile player.log &   # physics/sensors without a GPU window
 python3 tools/sim_check.py --drive          # topic rates + drives the rover and checks odom/GPS/IMU agree
-tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics
+tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics and Soil model
 ```
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.
@@ -263,7 +380,12 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
   CustomDirt with the drive bench so a commanded 0.5 rad/s point turn matches: chassis_2024 2.1 (was 2.3 before the
   drivetrain model and the 86 -> 35 kg mass fix), mini_rover 2.2. Retune against the real rover if needed.
 - Saving a scene writes every serialized field. Changing a default in code does NOT change existing scenes; use
-  `SimFlakeTools.UpgradeScenes` (or the inspector).
+  `SimFlakeTools.UpgradeScenes` (or the inspector). Same for prefabs: a field added to a component later keeps the
+  default it had when the prefab was first imported, so setup code sets such values explicitly (`startupCoast`).
+- `TerrainData.SetAlphamaps` before `AssetDatabase.CreateAsset(terrainData)` is lost (splat maps come back as layer 0
+  everywhere). Create the asset first (`SoilYardBuilder`).
+- `ArticulationBody.TeleportRoot` on a rover that has been driving can leave it tumbling (seen in the soil demo, cause
+  not found). Destroy and re-instantiate instead (`DriveTestRunner.Spawn`, `SoilDemo.Teleport`).
 - GPU readback row order: on OpenGL (Unity's default on Linux) camera RenderTexture readback is top-row-first.
   `ImageConversion.EncodeArrayToJPG` wants bottom-row-first. See `SensorCamera.ReadbackIsTopDown`. Verified with real
   frames on OpenGL only. If someone forces Vulkan and images are upside down, that's the place to fix.

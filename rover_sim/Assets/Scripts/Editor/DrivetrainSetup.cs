@@ -254,6 +254,7 @@ namespace SimFlake.EditorTools
                     if (w == null) throw new Exception("wheel " + i + " not found");
                     wheels.Add(w);
                 }
+                LevelBogies(wheels);
                 AttachDrivetrain(root, wheels, motor, wheel);
                 if (totalMassKg > 0) ScaleBodyMass(root, wheels, totalMassKg);
                 if (turnSlipFactor > 0) { so.FindProperty("turnSlipFactor").doubleValue = turnSlipFactor; so.ApplyModifiedPropertiesWithoutUndo(); }
@@ -265,6 +266,33 @@ namespace SimFlake.EditorTools
             finally { PrefabUtility.UnloadPrefabContents(root); }
         }
 
+        /// <summary>
+        /// Turn each bogie (a body carrying exactly two wheels) about its pivot until its two wheels are at the same
+        /// height, so the rover starts standing on all six wheels. chassis_2024's URDF zero pose has every bogie ~12 deg
+        /// off level (three wheels 10 cm in the air). The joint zero moves with it; the limits stay +-what they were.
+        /// </summary>
+        public static void LevelBogies(IList<ArticulationBody> wheels)
+        {
+            foreach (var grp in wheels.GroupBy(w => w.transform.parent != null ? w.transform.parent.GetComponentInParent<ArticulationBody>() : null))
+            {
+                var bogie = grp.Key;
+                if (bogie == null || bogie.isRoot || grp.Count() != 2 || bogie.jointType != ArticulationJointType.RevoluteJoint) continue;
+                Vector3 pivot = bogie.transform.TransformPoint(bogie.anchorPosition);
+                Vector3 axis = bogie.transform.rotation * (bogie.anchorRotation * Vector3.right);
+                var hubs = grp.Select(w => w.transform.TransformPoint(w.anchorPosition) - pivot).ToArray();
+                float best = 0, bestErr = float.MaxValue;
+                for (float a = -35f; a <= 35f; a += 0.05f)
+                {
+                    var q = Quaternion.AngleAxis(a, axis);
+                    float err = Mathf.Abs((q * hubs[0]).y - (q * hubs[1]).y);
+                    if (err < bestErr - 1e-6f) { bestErr = err; best = a; }
+                }
+                if (Mathf.Abs(best) < 0.1f) continue;
+                bogie.transform.RotateAround(pivot, axis, best);
+                Debug.Log($"[Drivetrain] {bogie.name}: turned {best:F1} deg so its wheels are level (was {Mathf.Abs(hubs[0].y - hubs[1].y) * 1000:F0} mm apart)");
+            }
+        }
+
         /// <summary>Wheel colliders from the WheelSpec, a DriveWheel on each wheel, and the HUD on the robot root.</summary>
         public static void AttachDrivetrain(GameObject robot, IEnumerable<ArticulationBody> wheels, DriveMotorSpec motor, WheelSpec spec)
         {
@@ -274,6 +302,7 @@ namespace SimFlake.EditorTools
                 ApplyWheelSpec(w, spec, mesh);
                 var dw = w.GetComponent<DriveWheel>() ?? w.gameObject.AddComponent<DriveWheel>();
                 dw.motor = motor; dw.wheel = spec;
+                dw.startupCoast = 1.5f;   // written explicitly: prefabs keep the value they were saved with, not the code default
                 // Initial drive: the DriveWheel rewrites it every step; this is what an editor (not playing) shows.
                 var d = w.xDrive;
                 d.driveType = ArticulationDriveType.Force;   // Velocity/Target types ignore damping (Unity computes its own gains)
@@ -282,6 +311,8 @@ namespace SimFlake.EditorTools
                 w.jointFriction = 0; w.angularDamping = 0.05f;
             }
             if (robot.GetComponent<DrivetrainHud>() == null) robot.AddComponent<DrivetrainHud>();
+            try { TreadBaker.BakeInto(spec, wheels.ToList()); }
+            catch (Exception e) { Debug.LogWarning($"[Tread] {robot.name}: could not bake the tread ({e.Message}); the soil model will use a smooth tyre"); }
             Debug.Log($"[Drivetrain] {robot.name}: {motor.name}: {motor.Summary}");
         }
 
@@ -442,6 +473,8 @@ namespace SimFlake.EditorTools
                 Load<PhysicMaterial>("Assets/Materials/CustomDirt.physicMaterial"),
                 Load<PhysicMaterial>("Assets/Materials/Asphalt.physicMaterial"),
             };
+            SoilSetup.EnsureAssets();
+            runner.soils = SoilSetup.All.ToArray();
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(TestScene));
             bool ok = EditorSceneManager.SaveScene(scene, TestScene);
             Debug.Log(ok ? "[Drivetrain] saved " + TestScene : "[Drivetrain] FAILED to save " + TestScene);

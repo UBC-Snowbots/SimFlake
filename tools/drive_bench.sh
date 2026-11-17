@@ -6,6 +6,9 @@
 #   tools/drive_bench.sh --setup                 # first re-apply DrivetrainSetup (specs -> prefabs, physics settings, scene)
 #   tools/drive_bench.sh --no-build -- --drive-test-rovers mini_rover --drive-test-only spin,slope --drive-test-trace
 #
+#   tools/drive_bench.sh --no-build -- --drive-test-grounds none --soils LooseSand,Hardpack --soil-quality high
+#
+# By default every rover runs on the PhysX grounds and then on every soil (wheel-soil model): ~15 min.
 # Anything after `--` goes to the player (see DriveTestRunner.cs for the flags). Results: table on stdout,
 # JSON in $OUT/results.json, full log in $OUT/player.log.
 set -euo pipefail
