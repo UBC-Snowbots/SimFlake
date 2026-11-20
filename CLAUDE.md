@@ -286,7 +286,7 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
   North site of the same lidar tile is the obvious place for a delivery course.
 
 ## In-game menu and cameras
-`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with three tabs. CONTROLS lists every hotkey except the menu's own
+`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with five tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
 (Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
 shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ENVIRONMENT has the scene's `SkyEnvironment` time of day and weather
 (no hotkeys on purpose). WORLD swaps the rover (ROVER > MODEL) and loads another scene of the build.
@@ -303,6 +303,15 @@ shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JP
 - It creates itself after the scene loads (`RuntimeInitializeOnLoadMethod`), so scenes need nothing, and it doesn't run in
   `-batchmode` (benches, PlayShots and the soil demo are unaffected). Settings are runtime only. In the editor,
   QualitySettings changes are undone when Play stops, because Unity would otherwise keep them in ProjectSettings.
+- **ADVANCED** (button right of the tabs, `Tools/SimMenuAdvanced.cs`, a `partial` of SimMenu): MOTORS (`DriveMotorSpec` + derived top
+  speed/torque, per-wheel thermal/rolling resistance), WHEELS & TYRES (`WheelSpec`, tread PhysicMaterial, wheel mass), ROVER BODY (every
+  body's mass, `MotorController` turnSlipFactor/geometry/timeout, rocker differential, suspension friction/damping, solver iterations),
+  SOIL (`SoilWorld` knobs, every `GroundSpec` + its PhysicMaterial, "clear ruts + apply"), PHYSICS (time scale, physics step, gravity).
+  Nothing is saved: spec assets, PhysicMaterials and global physics settings are put back in `OnApplicationQuit` (so in the editor
+  a test never changes the project), components reset with Play mode. Spec knobs come from the fields by reflection ([Header] =
+  sub-heading, [Tooltip] shown on hover, [Range] = slider), so new spec fields appear without menu changes; fields only used at
+  setup (wheel radius, collider shape, motor inertia) are read-only. Tyre changes rebuild the tyre model (`DriveWheel.ReconfigureSoil`).
+  `--sim-menu-shots` saves each page and checks that doubling the motor supply voltage doubles top speed and RESET ALL undoes it.
 - **Arrow keys drive the rover** (on by default; toggle, speed 0.5 m/s and turn rate 0.8 rad/s in CONTROLS > KEYBOARD DRIVE, Shift = x2).
   For quick tests without ROS. `SimMenu.KeyboardDrive` calls `MotorController.CmdVelCallback` only while a key is held (+ one stop
   on release), so ROS `/cmd_vel` still works. It drives the followed / selected rover. `CameraOrbit` (SampleScene) ignores the arrows while it is on.

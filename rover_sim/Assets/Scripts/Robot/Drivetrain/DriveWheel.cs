@@ -391,6 +391,9 @@ public class DriveWheel : MonoBehaviour
 
     // ---------------- soil ----------------
 
+    /// <summary>Rebuild the tyre model on the next step (after tyre or soil settings changed at runtime, Esc menu).</summary>
+    public void ReconfigureSoil() => soilVersion = -2;
+
     /// <summary>(Re)connect to the scene's SoilWorld: build the tyre model for its quality preset and stop colliding with soil terrains.</summary>
     void ConnectSoil()
     {

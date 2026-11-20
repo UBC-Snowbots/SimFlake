@@ -17,7 +17,7 @@ using UnityEngine.SceneManagement;
 /// turns the follow camera on, saves one PNG per tab and quits.
 /// </summary>
 [DefaultExecutionOrder(-100)]
-public class SimMenu : MonoBehaviour
+public partial class SimMenu : MonoBehaviour
 {
     public static SimMenu Instance { get; private set; }
     public static bool IsOpen => Instance != null && Instance.open;
@@ -60,6 +60,19 @@ public class SimMenu : MonoBehaviour
             for (int i = 0; i < 5; i++) yield return null;
             yield return Grab(dir, "menu_" + Tabs[t].ToLowerInvariant());
         }
+        advanced = true;
+        for (int t = 0; t < AdvTabs.Length; t++)
+        {
+            advTab = t;
+            for (int i = 0; i < 5; i++) yield return null;
+            yield return Grab(dir, "advanced_" + t + "_" + AdvTabs[t].Split(' ')[0].ToLowerInvariant());
+        }
+        advTab = 0;
+        for (int i = 0; i < 3; i++) yield return null;
+        advanced = false;
+        SetOpen(false);
+        yield return AdvancedSelfTest();
+        SetOpen(true);
         // Keyboard drive path: forward 3 s, then turn left 2 s.
         FindRovers();
         if (rovers.Count > 0)
@@ -183,6 +196,7 @@ public class SimMenu : MonoBehaviour
     void OnSceneLoaded(Scene s, LoadSceneMode m)
     {
         following = false; followCam = null; rovers.Clear(); terrainOriginals.Clear(); terrainDetail = -1; pendingSwap = -1;
+        ForgetSceneKnobs();
         CaptureBaseFixedDt();
         RoverSwap.Snapshot();
         if (followAfterLoad) StartCoroutine(FollowSoon());
@@ -363,11 +377,14 @@ public class SimMenu : MonoBehaviour
         if (pendingSwap >= 0) { int k = pendingSwap; pendingSwap = -1; SwapRover(k); }
         KeyboardDrive();
         if (Input.GetKeyDown(menuKey)) SetOpen(!open);
-        if (open)
+        if (open && GUIUtility.keyboardControl != 0) { } // typing into a field (advanced menu): no hotkeys
+        else if (open)
         {
-            if (Input.GetKeyDown(KeyCode.Q)) tab = (tab + Tabs.Length - 1) % Tabs.Length;
-            if (Input.GetKeyDown(KeyCode.E)) tab = (tab + 1) % Tabs.Length;
-            for (int i = 0; i < Tabs.Length; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) tab = i;
+            int n = advanced ? AdvTabs.Length : Tabs.Length;
+            ref int t = ref (advanced ? ref advTab : ref tab);
+            if (Input.GetKeyDown(KeyCode.Q)) { t = (t + n - 1) % n; scroll = Vector2.zero; }
+            if (Input.GetKeyDown(KeyCode.E)) { t = (t + 1) % n; scroll = Vector2.zero; }
+            for (int i = 0; i < n; i++) if (Input.GetKeyDown(KeyCode.Alpha1 + i)) { t = i; scroll = Vector2.zero; }
         }
         else
         {
@@ -498,6 +515,7 @@ public class SimMenu : MonoBehaviour
 
     void OnApplicationQuit()
     {
+        RestoreAssetKnobs();
 #if UNITY_EDITOR
         if (originalLevel < 0) return;
         foreach (var kv in touchedLevels)
@@ -740,10 +758,12 @@ public class SimMenu : MonoBehaviour
         GUI.Label(new Rect(panel.xMax - 430, panel.y + 42, 400, 18), cam, sStatus);
 
         // Tabs.
-        float tabY = panel.y + 78, tabW = 140;
+        float tabY = panel.y + 78;
+        if (advanced) { DrawAdvanced(panel, x0, tabY); DrawFooter(panel, x0); return; }
+        float tabW = 140;
         for (int i = 0; i < Tabs.Length; i++)
             if (GUI.Button(new Rect(x0 + i * (tabW + 6), tabY, tabW, 32), $"{Tabs[i]}", i == tab ? sTabOn : sTabOff)) { tab = i; scroll = Vector2.zero; }
-        GUI.Label(new Rect(panel.xMax - 228, tabY + 8, 200, 20), "[Q] [E] SWITCH", sStatus);
+        if (GUI.Button(new Rect(panel.xMax - 208, tabY, 180, 32), "ADVANCED  ▸", sTabOff)) { advanced = true; scroll = Vector2.zero; FindRovers(); }
         Fill(new Rect(panel.x + 12, tabY + 32, panel.width - 24, 2), Cyan);
 
         // Content.
@@ -760,10 +780,13 @@ public class SimMenu : MonoBehaviour
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+        DrawFooter(panel, x0);
+    }
 
-        // Footer.
+    void DrawFooter(Rect panel, float x0)
+    {
         Fill(new Rect(panel.x + 12, panel.yMax - 40, panel.width - 24, 1), CyanDim);
-        GUI.Label(new Rect(x0, panel.yMax - 34, 700, 22), "[ESC] CLOSE      SIMULATION KEEPS RUNNING      SETTINGS LAST UNTIL PLAY STOPS", sSub);
+        GUI.Label(new Rect(x0, panel.yMax - 34, 900, 22), "[ESC] CLOSE   [Q] [E] SWITCH TABS   SIMULATION KEEPS RUNNING   SETTINGS LAST UNTIL PLAY STOPS", sSub);
         var stripes2 = new Rect(panel.xMax - 150, panel.yMax - 30, 110, 12);
         GUI.DrawTextureWithTexCoords(stripes2, texStripes, new Rect(0, 0, stripes2.width / 16f, 1));
     }
