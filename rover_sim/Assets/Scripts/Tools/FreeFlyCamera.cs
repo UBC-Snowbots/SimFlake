@@ -3,6 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Spectator camera for looking around a world in Play mode (no robot needed).
 /// Hold the right mouse button to look, WASD to move, Q/E down/up, Shift = fast, scroll = change speed.
+/// <see cref="SimMenu"/> switches between this and <see cref="FollowCamera"/> (V); input is ignored while the menu is open.
 /// </summary>
 public class FreeFlyCamera : MonoBehaviour
 {
@@ -12,7 +13,8 @@ public class FreeFlyCamera : MonoBehaviour
 
     float yaw, pitch;
 
-    void Start()
+    // OnEnable (not Start): after the follow camera has moved the camera, pick up its new direction.
+    void OnEnable()
     {
         var e = transform.eulerAngles;
         yaw = e.y;
@@ -21,6 +23,7 @@ public class FreeFlyCamera : MonoBehaviour
 
     void Update()
     {
+        if (SimMenu.IsOpen) return;
         if (Input.GetMouseButton(1))
         {
             yaw += Input.GetAxis("Mouse X") * lookSensitivity;

@@ -49,17 +49,17 @@ public class RGBCameraCapture : MonoBehaviour
         timer = 0;
         if (System.Threading.Volatile.Read(ref inFlight) >= maxInFlight || !Ros.Connected) return; // previous frame still being sent, or nobody to send to
 
-        var rt = SensorCamera.Render(rgbCamera, width, height);
+        int w = width, h = height; // the resolution can change (Esc menu) while a frame is in flight
+        var rt = SensorCamera.Render(rgbCamera, w, h);
         var header = RosTime.Header(frameid);
         System.Threading.Interlocked.Increment(ref inFlight);
-        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGB24, req => OnReadback(req, header));
+        AsyncGPUReadback.Request(rt, 0, TextureFormat.RGB24, req => OnReadback(req, header, w, h));
     }
 
-    void OnReadback(AsyncGPUReadbackRequest req, std_msgs.msg.Header header)
+    void OnReadback(AsyncGPUReadbackRequest req, std_msgs.msg.Header header, int w, int h)
     {
         if (req.hasError || this == null) { System.Threading.Interlocked.Decrement(ref inFlight); return; }
-        byte[] pixels = SensorCamera.CopyRows(req.GetData<byte>(), width, height, 3, topDown: true);
-        int w = width, h = height;
+        byte[] pixels = SensorCamera.CopyRows(req.GetData<byte>(), w, h, 3, topDown: true);
         infoPub.Publish(SensorCamera.Info(rgbCamera, w, h, header));
 
         SensorCamera.Background(() =>
