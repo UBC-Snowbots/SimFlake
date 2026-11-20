@@ -286,8 +286,8 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
   North site of the same lidar tile is the obvious place for a delivery course.
 
 ## In-game menu and cameras
-`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with three tabs. CONTROLS lists every hotkey and greys out
-the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
+`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with three tabs. CONTROLS lists every hotkey except the menu's own
+(Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
 shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. WORLD loads another scene of the build.
   Before loading it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
   objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
@@ -300,6 +300,9 @@ shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JP
 - Pictures: `<player> -screen-fullscreen 0 -screen-width 1600 -screen-height 900 --sim-menu-shots <dir>` saves the follow view
   plus one PNG per tab, then loads the next world of the build (follow camera kept) and saves that, then quits. It needs a **windowed** run: OnGUI never runs in `-batchmode`, and a batchmode
   backbuffer reads back blank.
+- Linux players: fullscreen below the desktop resolution ("downscaled viewport" in the log) offsets the mouse, so IMGUI clicks
+  miss. `SimMenu` switches such a player to the desktop resolution at start. Any `-screen-width/-height` run is saved to
+  `~/.config/unity3d/DefaultCompany/rover_sim/prefs` and reused by the next normal launch, so restore that file after test runs.
 
 ## Drive physics (drivetrain model)
 Code in `Scripts/Robot/Drivetrain/`, data in `Assets/Robots/Drivetrain/`, setup in `Editor/DrivetrainSetup.cs`.

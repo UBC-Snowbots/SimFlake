@@ -118,8 +118,20 @@ public class SimMenu : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+        FixDownscaledFullscreen();
         SceneManager.sceneLoaded += OnSceneLoaded;
         CaptureBaseFixedDt();
+    }
+
+    // Fullscreen below the desktop resolution ("downscaled viewport") on Linux: the mouse positions Unity reports don't
+    // match the scaled picture, so clicks miss the menu. Go to the desktop resolution instead.
+    static void FixDownscaledFullscreen()
+    {
+        if (Application.isEditor || Screen.fullScreenMode == FullScreenMode.Windowed) return;
+        int w = Display.main.systemWidth, h = Display.main.systemHeight;
+        if (w <= 0 || h <= 0 || (Screen.width == w && Screen.height == h)) return;
+        Debug.Log($"[SimMenu] fullscreen at {Screen.width}x{Screen.height} on a {w}x{h} desktop: switching to {w}x{h} (mouse input is offset when downscaled)");
+        Screen.SetResolution(w, h, Screen.fullScreenMode);
     }
 
     void OnDestroy()
@@ -591,7 +603,7 @@ public class SimMenu : MonoBehaviour
         float tabY = panel.y + 78, tabW = 150;
         for (int i = 0; i < Tabs.Length; i++)
             if (GUI.Button(new Rect(x0 + i * (tabW + 6), tabY, tabW, 32), $"{Tabs[i]}", i == tab ? sTabOn : sTabOff)) { tab = i; scroll = Vector2.zero; }
-        GUI.Label(new Rect(x0 + Tabs.Length * (tabW + 6) + 8, tabY + 8, 200, 20), "[Q] [E] SWITCH", sSub);
+        GUI.Label(new Rect(panel.xMax - 228, tabY + 8, 200, 20), "[Q] [E] SWITCH", sStatus);
         Fill(new Rect(panel.x + 12, tabY + 32, panel.width - 24, 2), Cyan);
 
         // Content.
@@ -629,12 +641,6 @@ public class SimMenu : MonoBehaviour
 
         return new List<(string, List<Hotkey>)>
         {
-            ("MENU", new List<Hotkey>
-            {
-                new Hotkey { keys = Key(menuKey), action = "Open / close this menu", available = true },
-                new Hotkey { keys = "Q / E", action = "Previous / next tab (menu open)", available = true },
-                new Hotkey { keys = "1 - " + Tabs.Length, action = "Jump to tab (menu open)", available = true },
-            }),
             ("VIEW", new List<Hotkey>
             {
                 new Hotkey { keys = Key(followKey), action = "Follow camera on / off (off = free camera)", available = rovers.Count > 0 },
