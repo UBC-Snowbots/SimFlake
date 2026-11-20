@@ -26,6 +26,8 @@ public class CompressedCameraCapture : MonoBehaviour
     public int maxInFlight = 2;
     int inFlight;
 
+    void OnDestroy() => pub?.Close();
+
     void Start()
     {
         if (rgbCamera == null) rgbCamera = GetComponent<Camera>();

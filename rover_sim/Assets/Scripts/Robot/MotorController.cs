@@ -90,6 +90,11 @@ public class MotorController : MonoBehaviour
     public double TurnSlipFactor { get => turnSlipFactor; set => turnSlipFactor = value; }
     public DriveWheel[] DriveWheels => driveWheels;
 
+    readonly System.Collections.Generic.List<RosSubscription> subs = new System.Collections.Generic.List<RosSubscription>();
+
+    // Swapped out at runtime (Esc menu): stop receiving commands for a rover that no longer exists.
+    void OnDestroy() { foreach (var s in subs) s.Unsubscribe(); subs.Clear(); }
+
     void Start()
     {
         for (int i = 0; i < motorCount; i++)
@@ -122,8 +127,8 @@ public class MotorController : MonoBehaviour
             Debug.Log($"[MotorController] wheel drive: type {wheelJoints[0].jointType}, stiffness {d.stiffness}, damping {d.damping}, forceLimit {d.forceLimit}");
         }
 
-        Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, CmdVelCallback);
-        Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback);
+        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, CmdVelCallback));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback));
 
         if (publishOdometry)
         {

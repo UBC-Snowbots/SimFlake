@@ -74,6 +74,10 @@ public class ArmController : MonoBehaviour
     RosPublisher<sensor_msgs.msg.JointState> jointStatePub;
     float feedbackTimer;
 
+    readonly List<RosSubscription> subs = new List<RosSubscription>();
+
+    void OnDestroy() { foreach (var s in subs) s.Unsubscribe(); subs.Clear(); }
+
     void Start()
     {
         for (int i = 0; i < NUM_AXES; i++)
@@ -93,9 +97,9 @@ public class ArmController : MonoBehaviour
         SetupDrive(endEffectorLeftJoint, ee_torque);
         SetupDrive(endEffectorRightJoint, ee_torque);
 
-        Ros.Subscribe<rover_msgs.msg.ArmCommand>(armCommandTopicName, ArmCommandCallback);
-        Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback);
-        Ros.Subscribe<std_msgs.msg.Float64>(endEffectorCommandTopicName, endEffectorCallback);
+        subs.Add(Ros.Subscribe<rover_msgs.msg.ArmCommand>(armCommandTopicName, ArmCommandCallback));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64>(endEffectorCommandTopicName, endEffectorCallback));
         positionPub = Ros.Advertise<std_msgs.msg.Float64MultiArray>(armPositionFeedbackTopicName, 2);
         jointStatePub = Ros.Advertise<sensor_msgs.msg.JointState>(jointStatesTopicName, 2);
     }

@@ -289,9 +289,17 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
 `Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with three tabs. CONTROLS lists every hotkey except the menu's own
 (Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
 shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ENVIRONMENT has the scene's `SkyEnvironment` time of day and weather
-(no hotkeys on purpose). WORLD loads another scene of the build.
-  Before loading it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
+(no hotkeys on purpose). WORLD swaps the rover (ROVER > MODEL) and loads another scene of the build.
+  Before loading a scene it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
   objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
+- Rover swap (`Scripts/Robot/RoverCatalog.cs`): the list is `Resources/RoverCatalog.asset` (label + prefab; being in Resources puts
+  both prefabs in every build). A scene rover is matched to an entry by its `DriveWheel.wheel` spec. The new rover goes where the old
+  one's moving body was (same heading, 5 cm above the ground under it); the old one is destroyed. It uses the scene's own copy of
+  that rover if there is one (copied at scene load, before anything moves, so per-scene overrides survive), else the prefab.
+  `/gps/fix` continues in the old rover's frame (`LocationStuff.ContinueFrameOf`), `/odom` restarts at zero. The old rover's
+  subscriptions are dropped and its camera sockets closed (`RosPublisher.Close`). Scene objects pointing into the old rover
+  (`CameraOrbit`, `RGBCameraObject`, `CameraSwapper`, `SoilRenderer`, `StoneField`) are pointed at the same-named part of the new one.
+  `--sim-menu-shots` also swaps to every rover and back (`rover_*.png`).
 - It creates itself after the scene loads (`RuntimeInitializeOnLoadMethod`), so scenes need nothing, and it doesn't run in
   `-batchmode` (benches, PlayShots and the soil demo are unaffected). Settings are runtime only. In the editor,
   QualitySettings changes are undone when Play stops, because Unity would otherwise keep them in ProjectSettings.

@@ -112,6 +112,9 @@ public class StoneField : MonoBehaviour
         return sum * (d1 - d0) / n;
     }
 
+    /// <summary>Look for rovers again (one was swapped for another at runtime).</summary>
+    public void FindRovers() => rovers = FindObjectsOfType<MotorController>();
+
     void Update()
     {
         if (Time.time < nextScan) return;

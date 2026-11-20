@@ -6,7 +6,8 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
-/// SOIL (soil model quality, ruts), ENVIRONMENT (time of day, weather), WORLD (load another scene of the build). V toggles the follow camera without opening the menu.
+/// SOIL (soil model quality, ruts), ENVIRONMENT (time of day, weather), WORLD (swap the rover for another kind, load
+/// another scene of the build). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
 /// and the soil demo are unaffected). Settings are runtime only; in the editor, graphics quality settings are put back
@@ -51,6 +52,22 @@ public class SimMenu : MonoBehaviour
             tab = t;
             for (int i = 0; i < 5; i++) yield return null;
             yield return Grab(dir, "menu_" + Tabs[t].ToLowerInvariant());
+        }
+        // Swap to every other rover kind, then back.
+        FindRovers();
+        var cat = RoverCatalog.Load();
+        int first = cat != null && rovers.Count > 0 ? cat.IndexOf(rovers[roverIndex].root.gameObject) : -1;
+        if (first >= 0)
+        {
+            SetOpen(false);
+            for (int k = 1; k <= cat.rovers.Count; k++)
+            {
+                int kind = (first + k) % cat.rovers.Count;
+                SwapRover(kind);
+                for (int i = 0; i < 240; i++) yield return null; // settle
+                yield return Grab(dir, "rover_" + kind + "_" + cat.rovers[kind].label.Replace(' ', '_').ToLowerInvariant());
+            }
+            SetOpen(true);
         }
         if (SceneManager.sceneCountInBuildSettings > 1)
         {
@@ -121,6 +138,7 @@ public class SimMenu : MonoBehaviour
         FixDownscaledFullscreen();
         SceneManager.sceneLoaded += OnSceneLoaded;
         CaptureBaseFixedDt();
+        RoverSwap.Snapshot();
     }
 
     // Fullscreen below the desktop resolution ("downscaled viewport") on Linux: the mouse positions Unity reports don't
@@ -142,8 +160,9 @@ public class SimMenu : MonoBehaviour
 
     void OnSceneLoaded(Scene s, LoadSceneMode m)
     {
-        following = false; followCam = null; rovers.Clear(); terrainOriginals.Clear(); terrainDetail = -1;
+        following = false; followCam = null; rovers.Clear(); terrainOriginals.Clear(); terrainDetail = -1; pendingSwap = -1;
         CaptureBaseFixedDt();
+        RoverSwap.Snapshot();
         if (followAfterLoad) StartCoroutine(FollowSoon());
         followAfterLoad = false;
         if (open) RefreshScene();
@@ -200,8 +219,44 @@ public class SimMenu : MonoBehaviour
         SceneManager.LoadScene(buildIndex);
     }
 
+    // ---------------------------------------------------------------- rover swap
+
+    int pendingSwap = -1; // done in Update, not in the middle of drawing the menu
+
+    void SwapRover(int kind)
+    {
+        FindRovers();
+        var cat = RoverCatalog.Load();
+        if (cat == null || rovers.Count == 0) return;
+        var rover = RoverSwap.Swap(rovers[roverIndex].root.gameObject, kind);
+        if (rover == null) { Toast("ROVER SWAP FAILED"); return; }
+        FindRovers();
+        roverIndex = Mathf.Max(0, rovers.FindIndex(b => b.root == rover.transform));
+        if (following) SetFollow(true);
+        RefreshScene();
+        Toast("ROVER: " + cat.rovers[kind].label);
+    }
+
+    void DrawRover()
+    {
+        var cat = RoverCatalog.Load();
+        if (cat == null || cat.rovers.Count < 2) return;
+        Section("ROVER");
+        if (rovers.Count == 0) { Hint("No rover in this scene."); return; }
+        int cur = cat.IndexOf(rovers[roverIndex].root.gameObject);
+        var labels = new string[cat.rovers.Count];
+        for (int i = 0; i < labels.Length; i++) labels[i] = cat.rovers[i].label;
+        Row(rovers.Count > 1 ? RoverName(rovers[roverIndex]).ToUpperInvariant() : "MODEL");
+        int n = Seg(cur, labels);
+        EndRow();
+        if (n != cur && n >= 0) pendingSwap = n;
+        Hint("Swaps the rover where it stands (same spot and heading); the world is not reloaded. Both rovers use the same " +
+             "topics. /gps/fix carries on, /odom starts again from zero." + (rovers.Count > 1 ? " Pick which rover in CAMERA > ROVER." : ""));
+    }
+
     void DrawWorld()
     {
+        DrawRover();
         Section("WORLDS IN THIS BUILD");
         int n = SceneManager.sceneCountInBuildSettings;
         int current = SceneManager.GetActiveScene().buildIndex;
@@ -250,6 +305,7 @@ public class SimMenu : MonoBehaviour
     {
         fps = Mathf.Lerp(fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 1e-4f), 0.05f);
 
+        if (pendingSwap >= 0) { int k = pendingSwap; pendingSwap = -1; SwapRover(k); }
         if (Input.GetKeyDown(menuKey)) SetOpen(!open);
         if (open)
         {

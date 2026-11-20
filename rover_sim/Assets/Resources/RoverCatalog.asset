@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b60823e04c484d299eb27618ca7d73f5, type: 3}
+  m_Name: RoverCatalog
+  m_EditorClassIdentifier: 
+  rovers:
+  - label: CHASSIS 2024
+    prefab: {fileID: 4718049914147549901, guid: 628471afc5c9914faa93ae8ae88a591f, type: 3}
+  - label: MINI ROVER
+    prefab: {fileID: 7320570949144584995, guid: 9104d7d313b46187984663d912638d53, type: 3}

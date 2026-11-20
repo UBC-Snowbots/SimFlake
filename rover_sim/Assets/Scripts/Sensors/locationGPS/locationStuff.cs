@@ -47,10 +47,32 @@ public class LocationStuff : MonoBehaviour
     float timer;
     System.Random rng = new System.Random();
 
+    bool started, hasFrame;
+    Vector3 frameStart;
+    double frameLat, frameLon, frameAlt;
+
+    /// <summary>Report positions in <paramref name="other"/>'s frame (call before this one's Start). Used when a rover
+    /// is swapped for another at runtime, so /gps/fix carries on where the old rover's left off.</summary>
+    public void ContinueFrameOf(LocationStuff other)
+    {
+        if (other == null || !other.started) return;
+        hasFrame = true;
+        frameStart = other.startPosition;
+        frameLat = other.startLatitude; frameLon = other.startLongitude; frameAlt = other.startAltitude;
+    }
+
     void Start()
     {
         if (object_to_track == null) object_to_track = transform;
         startPosition = object_to_track.position;
+        if (hasFrame)
+        {
+            Vector3 d = startPosition - frameStart;
+            startLatitude = frameLat + Rad2Deg(d.z / EarthRadius);
+            startLongitude = frameLon + Rad2Deg(d.x / (EarthRadius * Math.Cos(Deg2Rad(frameLat))));
+            startAltitude = frameAlt + d.y;
+        }
+        started = true;
         pub = Ros.Advertise<sensor_msgs.msg.NavSatFix>(topic, 2);
         SetText("Initializing GPS...");
         Invoke(nameof(StartGps), startupDelay);

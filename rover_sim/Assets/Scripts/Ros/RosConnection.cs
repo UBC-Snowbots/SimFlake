@@ -48,6 +48,13 @@ namespace SimFlake.Ros
             "{\"op\":\"advertise\",\"topic\":" + RosJson.Quote(Topic) + ",\"type\":" + RosJson.Quote(RosType<T>.Name) +
             ",\"queue_size\":" + QueueSize + "}";
 
+        /// <summary>Stop publishing (an object that is destroyed while the scene keeps running, e.g. a swapped-out rover):
+        /// closes a dedicated socket, and the advertisement is not repeated on reconnect.</summary>
+        public void Close()
+        {
+            if (RosConnection.HasInstance) RosConnection.Instance.Close(Socket, AdvertiseOp);
+        }
+
         /// <summary>True when the frame was queued, false when dropped (not connected, or the publisher is behind).</summary>
         public bool Publish(T msg)
         {
@@ -259,6 +266,17 @@ namespace SimFlake.Ros
                 if (main.Connected) main.EnqueueText(sub.SubscribeOp());
             }
             return sub;
+        }
+
+        internal void Close(RosBridgeSocket socket, Func<string> advertiseOp)
+        {
+            if (socket != main)
+            {
+                socket.Dispose();
+                sockets.Remove(socket);
+                return;
+            }
+            lock (registryLock) mainAdverts.Remove(advertiseOp);
         }
 
         internal void Unsubscribe(RosSubscription sub)

@@ -29,6 +29,8 @@ public class RGBCameraCapture : MonoBehaviour
     public int maxInFlight = 2;
     int inFlight;
 
+    void OnDestroy() { imagePub?.Close(); infoPub?.Close(); }
+
     void Start()
     {
         if (rgbCamera == null) rgbCamera = GetComponent<Camera>();
