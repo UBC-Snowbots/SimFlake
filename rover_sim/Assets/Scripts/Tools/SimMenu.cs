@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
-/// SOIL (soil model quality, ruts), WORLD (load another scene of the build). V toggles the follow camera without opening the menu.
+/// SOIL (soil model quality, ruts), ENVIRONMENT (time of day, weather), WORLD (load another scene of the build). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
 /// and the soil demo are unaffected). Settings are runtime only; in the editor, graphics quality settings are put back
@@ -94,7 +94,7 @@ public class SimMenu : MonoBehaviour
     // ---------------------------------------------------------------- state
     bool open;
     int tab;
-    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "WORLD" };
+    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "ENVIRONMENT", "WORLD" };
     Vector2 scroll;
     string toast; float toastUntil;
 
@@ -154,6 +154,34 @@ public class SimMenu : MonoBehaviour
     {
         yield return null; // let the rovers' Start run
         SetFollow(true);
+    }
+
+    // ---------------------------------------------------------------- tab: environment
+
+    static readonly string[] TimeNames = { "SUNRISE", "MIDDAY", "SUNSET", "NIGHT" };
+    static readonly string[] WeatherNames = { "CLEAR", "CLOUDY" };
+    SkyEnvironment sky;
+
+    void DrawEnvironment()
+    {
+        if (sky == null) sky = FindObjectOfType<SkyEnvironment>();
+        Section("SKY");
+        if (sky == null)
+        {
+            Hint("This scene has no Sky Environment object, so time of day and weather are fixed. " +
+                 "Scenes with one: BadlandsTraversal, UrcAutonomySite, SoilYard, ChassisPlayground.");
+            return;
+        }
+        Row("TIME OF DAY");
+        int t = Seg((int)sky.timeOfDay, TimeNames);
+        EndRow();
+        Row("WEATHER");
+        int w = Seg((int)sky.weather, WeatherNames);
+        EndRow();
+        if (t != (int)sky.timeOfDay || w != (int)sky.weather)
+            sky.Set((SkyEnvironment.TimeOfDay)t, (SkyEnvironment.Weather)w);
+        Hint("Moves the sun (or moon) and changes sky, ambient light, fog and reflections. Rover cameras see it too. " +
+             "Players also take --time-of-day and --weather on the command line.");
     }
 
     // ---------------------------------------------------------------- worlds
@@ -600,7 +628,7 @@ public class SimMenu : MonoBehaviour
         GUI.Label(new Rect(panel.xMax - 430, panel.y + 42, 400, 18), cam, sStatus);
 
         // Tabs.
-        float tabY = panel.y + 78, tabW = 150;
+        float tabY = panel.y + 78, tabW = 140;
         for (int i = 0; i < Tabs.Length; i++)
             if (GUI.Button(new Rect(x0 + i * (tabW + 6), tabY, tabW, 32), $"{Tabs[i]}", i == tab ? sTabOn : sTabOff)) { tab = i; scroll = Vector2.zero; }
         GUI.Label(new Rect(panel.xMax - 228, tabY + 8, 200, 20), "[Q] [E] SWITCH", sStatus);
@@ -615,7 +643,8 @@ public class SimMenu : MonoBehaviour
             case 0: DrawControls(content.width - 20); break;
             case 1: DrawCamera(); break;
             case 2: DrawSoil(); break;
-            case 3: DrawWorld(); break;
+            case 3: DrawEnvironment(); break;
+            case 4: DrawWorld(); break;
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
