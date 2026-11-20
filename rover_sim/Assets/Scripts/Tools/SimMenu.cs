@@ -26,6 +26,13 @@ public class SimMenu : MonoBehaviour
     public KeyCode followKey = KeyCode.V;
     public KeyCode nextRoverKey = KeyCode.T;
 
+    [Header("Keyboard drive (quick tests without ROS)")]
+    [Tooltip("Arrow keys drive the followed / selected rover. Shift = twice as fast.")]
+    public bool keyboardDrive = true;
+    public float keyboardSpeed = 0.5f;     // m/s
+    public float keyboardTurnRate = 0.8f;  // rad/s
+    public static bool KeyboardDriveOn => Instance != null && Instance.keyboardDrive;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Create()
     {
@@ -52,6 +59,21 @@ public class SimMenu : MonoBehaviour
             tab = t;
             for (int i = 0; i < 5; i++) yield return null;
             yield return Grab(dir, "menu_" + Tabs[t].ToLowerInvariant());
+        }
+        // Keyboard drive path: forward 3 s, then turn left 2 s.
+        FindRovers();
+        if (rovers.Count > 0)
+        {
+            var body = rovers[roverIndex];
+            Vector3 p0 = body.position; float y0 = body.eulerAngles.y;
+            for (float t = 0; t < 3f; t += Time.deltaTime) { Drive(1, 0, false); yield return null; }
+            Vector3 p1 = body.position;
+            for (float t = 0; t < 2f; t += Time.deltaTime) { Drive(0, 1, false); yield return null; }
+            Drive(0, 0, false);
+            Debug.Log($"[SimMenu] keyboard drive test: forward {Vector3.Distance(p0, p1):0.00} m in 3 s at {keyboardSpeed} m/s, " +
+                      $"then turned {Mathf.DeltaAngle(y0, body.eulerAngles.y):0} deg in 2 s at {keyboardTurnRate} rad/s");
+            for (int i = 0; i < 30; i++) yield return null;
+            yield return Grab(dir, "keyboard_drive");
         }
         // Swap to every other rover kind, then back.
         FindRovers();
@@ -219,6 +241,39 @@ public class SimMenu : MonoBehaviour
         SceneManager.LoadScene(buildIndex);
     }
 
+    // ---------------------------------------------------------------- keyboard drive
+
+    bool keyDriving;
+
+    // Arrow keys -> the same skid-steer path as /cmd_vel. Only while a key is held (plus one stop on release), so it
+    // never fights commands coming in over ROS.
+    void KeyboardDrive()
+    {
+        float fwd = 0, turn = 0;
+        if (keyboardDrive && !open)
+        {
+            fwd = (Input.GetKey(KeyCode.UpArrow) ? 1 : 0) - (Input.GetKey(KeyCode.DownArrow) ? 1 : 0);
+            turn = (Input.GetKey(KeyCode.LeftArrow) ? 1 : 0) - (Input.GetKey(KeyCode.RightArrow) ? 1 : 0);
+        }
+        Drive(fwd, turn, Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift));
+    }
+
+    void Drive(float fwd, float turn, bool fast)
+    {
+        bool active = fwd != 0 || turn != 0;
+        if (!active && !keyDriving) return;
+        keyDriving = active;
+        if (rovers.Count == 0 || roverIndex >= rovers.Count || rovers[roverIndex] == null) FindRovers();
+        if (rovers.Count == 0) return;
+        var mc = rovers[roverIndex].root.GetComponentInChildren<MotorController>();
+        if (mc == null) return;
+        float boost = fast ? 2f : 1f;
+        var twist = new geometry_msgs.msg.Twist();
+        twist.linear.x = fwd * keyboardSpeed * boost;
+        twist.angular.z = turn * keyboardTurnRate * boost;
+        mc.CmdVelCallback(twist);
+    }
+
     // ---------------------------------------------------------------- rover swap
 
     int pendingSwap = -1; // done in Update, not in the middle of drawing the menu
@@ -306,6 +361,7 @@ public class SimMenu : MonoBehaviour
         fps = Mathf.Lerp(fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 1e-4f), 0.05f);
 
         if (pendingSwap >= 0) { int k = pendingSwap; pendingSwap = -1; SwapRover(k); }
+        KeyboardDrive();
         if (Input.GetKeyDown(menuKey)) SetOpen(!open);
         if (open)
         {
@@ -748,9 +804,15 @@ public class SimMenu : MonoBehaviour
                 new Hotkey { keys = "R", action = "Snap back behind the rover", available = rovers.Count > 0 },
                 new Hotkey { keys = Key(nextRoverKey), action = "Follow the next rover", available = multi },
             }),
+            ("DRIVE (NO ROS NEEDED)", new List<Hotkey>
+            {
+                new Hotkey { keys = "UP / DOWN", action = "Drive forward / back", available = rovers.Count > 0 && keyboardDrive },
+                new Hotkey { keys = "LEFT / RIGHT", action = "Turn on the spot (or while driving)", available = rovers.Count > 0 && keyboardDrive },
+                new Hotkey { keys = "SHIFT", action = "Twice as fast", available = rovers.Count > 0 && keyboardDrive },
+            }),
             ("ORBIT CAMERA (SAMPLESCENE)", new List<Hotkey>
             {
-                new Hotkey { keys = "ARROWS", action = "Orbit", available = orbitOn },
+                new Hotkey { keys = "ARROWS", action = "Orbit (when arrow-key driving is off)", available = orbitOn && !keyboardDrive },
                 new Hotkey { keys = "Z / X", action = "Zoom in / out", available = orbitOn },
             }),
         };
@@ -782,8 +844,21 @@ public class SimMenu : MonoBehaviour
             }
             if (col == 1)
             {
-                Section("DRIVING");
-                GUILayout.Label("The rover is driven over ROS, not the keyboard: publish geometry_msgs/Twist on /cmd_vel " +
+                Section("KEYBOARD DRIVE");
+                Row("ARROW KEYS", 120);
+                keyboardDrive = Seg(keyboardDrive ? 1 : 0, new[] { "OFF", "ON" }) == 1;
+                EndRow();
+                if (keyboardDrive)
+                {
+                    Row("SPEED", 120);
+                    keyboardSpeed = Slider(keyboardSpeed, 0.1f, 2f, "{0:0.0} m/s", colW - 240);
+                    EndRow();
+                    Row("TURN RATE", 120);
+                    keyboardTurnRate = Slider(keyboardTurnRate, 0.2f, 2f, "{0:0.0} rad/s", colW - 240);
+                    EndRow();
+                }
+                GUILayout.Label("For quick tests. Arrow keys send the same command as /cmd_vel, only while a key is held, so ROS " +
+                                "commands still work. Real driving goes over ROS: geometry_msgs/Twist on /cmd_vel " +
                                 "(e.g. <b>ros2 run teleop_twist_keyboard teleop_twist_keyboard</b>). The arm listens on /arm/command.", sDim, GUILayout.Width(colW));
             }
             GUILayout.EndVertical();
@@ -1003,10 +1078,10 @@ public class SimMenu : MonoBehaviour
         GUILayout.Space(6);
     }
 
-    void Row(string label)
+    void Row(string label, float labelWidth = 190)
     {
         GUILayout.BeginHorizontal(GUILayout.MinHeight(30));
-        GUILayout.Label(label, sHead, GUILayout.Width(190), GUILayout.Height(28));
+        GUILayout.Label(label, sHead, GUILayout.Width(labelWidth), GUILayout.Height(28));
     }
 
     static void EndRow()
@@ -1025,11 +1100,11 @@ public class SimMenu : MonoBehaviour
         return result;
     }
 
-    float Slider(float value, float min, float max, string format)
+    float Slider(float value, float min, float max, string format, float width = 320)
     {
-        float v = GUILayout.HorizontalSlider(value, min, max, sSlider, sThumb, GUILayout.Width(320));
+        float v = GUILayout.HorizontalSlider(value, min, max, sSlider, sThumb, GUILayout.Width(width));
         GUILayout.Space(12);
-        GUILayout.Label(string.Format(format, v), sHead, GUILayout.Width(90), GUILayout.Height(28));
+        GUILayout.Label(string.Format(format, v), sHead, GUILayout.Width(100), GUILayout.Height(28));
         return v;
     }
 }

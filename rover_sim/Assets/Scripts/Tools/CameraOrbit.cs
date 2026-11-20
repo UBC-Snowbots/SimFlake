@@ -34,20 +34,21 @@ public class CameraOrbit : MonoBehaviour
     {
         if (target != null)
         {
-            // Rotate with arrow keys
-            if (Input.GetKey(KeyCode.LeftArrow))
+            // Rotate with arrow keys (unless they drive the rover, see SimMenu)
+            bool arrows = !SimMenu.KeyboardDriveOn;
+            if (arrows && Input.GetKey(KeyCode.LeftArrow))
             {
                 x -= xSpeed * Time.deltaTime;
             }
-            if (Input.GetKey(KeyCode.RightArrow))
+            if (arrows && Input.GetKey(KeyCode.RightArrow))
             {
                 x += xSpeed * Time.deltaTime;
             }
-            if (Input.GetKey(KeyCode.UpArrow))
+            if (arrows && Input.GetKey(KeyCode.UpArrow))
             {
                 y -= ySpeed * Time.deltaTime;
             }
-            if (Input.GetKey(KeyCode.DownArrow))
+            if (arrows && Input.GetKey(KeyCode.DownArrow))
             {
                 y += ySpeed * Time.deltaTime;
             }

@@ -72,7 +72,7 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 | Topic | Type | Script |
 |---|---|---|
-| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`: skid-steer, real m/s and rad/s. Wheels stop 0.5 s after the last command (like the real drivers), so publish continuously |
+| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`: skid-steer, real m/s and rad/s (arrow keys in Play do the same, see In-game menu). Wheels stop 0.5 s after the last command (like the real drivers), so publish continuously |
 | `/motor_commands` (sub) | std_msgs/Float64MultiArray | `MotorController`: 6 raw wheel targets, deg/s |
 | `/odom` | nav_msgs/Odometry | `MotorController`: wheel odometry, `odom` -> `base_link` |
 | `/wheel_joint_states` | sensor_msgs/JointState | `MotorController`: position, velocity, effort = wheel torque (N·m) |
@@ -303,6 +303,10 @@ shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JP
 - It creates itself after the scene loads (`RuntimeInitializeOnLoadMethod`), so scenes need nothing, and it doesn't run in
   `-batchmode` (benches, PlayShots and the soil demo are unaffected). Settings are runtime only. In the editor,
   QualitySettings changes are undone when Play stops, because Unity would otherwise keep them in ProjectSettings.
+- **Arrow keys drive the rover** (on by default; toggle, speed 0.5 m/s and turn rate 0.8 rad/s in CONTROLS > KEYBOARD DRIVE, Shift = x2).
+  For quick tests without ROS. `SimMenu.KeyboardDrive` calls `MotorController.CmdVelCallback` only while a key is held (+ one stop
+  on release), so ROS `/cmd_vel` still works. It drives the followed / selected rover. `CameraOrbit` (SampleScene) ignores the arrows while it is on.
+  `--sim-menu-shots` drives 3 s forward + 2 s left through the same path and logs the distance and turn.
 - **V** toggles `FollowCamera` (third person, on the MainCamera: RMB orbit, scroll zoom, R behind the rover, T next rover).
   Off = `FreeFlyCamera`, which gets added if the scene had none. Camera scripts ignore input while `SimMenu.IsOpen`.
 - Look: original "field PDA" style, drawn with IMGUI. Textures are generated in code, so there are no image assets.
