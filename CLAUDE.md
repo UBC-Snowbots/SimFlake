@@ -288,7 +288,9 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
 ## In-game menu and cameras
 `Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with three tabs. CONTROLS lists every hotkey and greys out
 the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
-shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step.
+shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. WORLD loads another scene of the build.
+  Before loading it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
+  objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
 - It creates itself after the scene loads (`RuntimeInitializeOnLoadMethod`), so scenes need nothing, and it doesn't run in
   `-batchmode` (benches, PlayShots and the soil demo are unaffected). Settings are runtime only. In the editor,
   QualitySettings changes are undone when Play stops, because Unity would otherwise keep them in ProjectSettings.
@@ -296,7 +298,7 @@ shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JP
   Off = `FreeFlyCamera`, which gets added if the scene had none. Camera scripts ignore input while `SimMenu.IsOpen`.
 - Look: original "field PDA" style, drawn with IMGUI. Textures are generated in code, so there are no image assets.
 - Pictures: `<player> -screen-fullscreen 0 -screen-width 1600 -screen-height 900 --sim-menu-shots <dir>` saves the follow view
-  plus one PNG per tab, then quits. It needs a **windowed** run: OnGUI never runs in `-batchmode`, and a batchmode
+  plus one PNG per tab, then loads the next world of the build (follow camera kept) and saves that, then quits. It needs a **windowed** run: OnGUI never runs in `-batchmode`, and a batchmode
   backbuffer reads back blank.
 
 ## Drive physics (drivetrain model)

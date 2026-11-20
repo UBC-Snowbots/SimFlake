@@ -334,6 +334,28 @@ namespace SimFlake.Ros
             GUI.color = prev;
         }
 
+        /// <summary>
+        /// Before loading another scene: forget every subscription and advertisement (their owners are about to be
+        /// destroyed) and close the per-topic camera sockets. The main socket and rosbridge stay up; the new scene's
+        /// scripts advertise and subscribe again.
+        /// </summary>
+        public static void ResetForSceneChange()
+        {
+            if (instance == null) return;
+            var c = instance;
+            lock (c.main.HandshakeLock)
+                lock (c.registryLock)
+                {
+                    foreach (var list in c.subsByTopic.Values)
+                        foreach (var s in list) s.Active = false;
+                    c.subsByTopic.Clear();
+                    c.mainAdverts.Clear();
+                }
+            foreach (var s in c.sockets) if (s != c.main) s.Dispose();
+            c.sockets.RemoveAll(s => s != c.main);
+            while (c.mainThread.TryDequeue(out _)) { }
+        }
+
         void OnApplicationQuit() => Shutdown();
         void OnDestroy() { if (instance == this) Shutdown(); }
 

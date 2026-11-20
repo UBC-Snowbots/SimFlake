@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
-/// SOIL (soil model quality, ruts). V toggles the follow camera without opening the menu.
+/// SOIL (soil model quality, ruts), WORLD (load another scene of the build). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
 /// and the soil demo are unaffected). Settings are runtime only; in the editor, graphics quality settings are put back
@@ -52,6 +52,13 @@ public class SimMenu : MonoBehaviour
             for (int i = 0; i < 5; i++) yield return null;
             yield return Grab(dir, "menu_" + Tabs[t].ToLowerInvariant());
         }
+        if (SceneManager.sceneCountInBuildSettings > 1)
+        {
+            int next = (SceneManager.GetActiveScene().buildIndex + 1) % SceneManager.sceneCountInBuildSettings;
+            LoadWorld(next);
+            for (int i = 0; i < 300; i++) yield return null;
+            yield return Grab(dir, "world_" + SceneName(next).ToLowerInvariant());
+        }
         Debug.Log($"[SimMenu] shots saved to {dir}");
         Application.Quit(0);
     }
@@ -87,7 +94,7 @@ public class SimMenu : MonoBehaviour
     // ---------------------------------------------------------------- state
     bool open;
     int tab;
-    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL" };
+    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "WORLD" };
     Vector2 scroll;
     string toast; float toastUntil;
 
@@ -125,6 +132,72 @@ public class SimMenu : MonoBehaviour
     {
         following = false; followCam = null; rovers.Clear(); terrainOriginals.Clear(); terrainDetail = -1;
         CaptureBaseFixedDt();
+        if (followAfterLoad) StartCoroutine(FollowSoon());
+        followAfterLoad = false;
+        if (open) RefreshScene();
+    }
+
+    bool followAfterLoad;
+    System.Collections.IEnumerator FollowSoon()
+    {
+        yield return null; // let the rovers' Start run
+        SetFollow(true);
+    }
+
+    // ---------------------------------------------------------------- worlds
+
+    static string SceneName(int buildIndex) => System.IO.Path.GetFileNameWithoutExtension(SceneUtility.GetScenePathByBuildIndex(buildIndex));
+
+    void LoadWorld(int buildIndex)
+    {
+        // Leave the physics step as the project has it (soil Ultra halves it), drop the old scene's ROS
+        // subscriptions and camera sockets (rosbridge keeps running), then load.
+        Time.fixedDeltaTime = baseFixedDt;
+        SimFlake.Ros.RosConnection.ResetForSceneChange();
+        followAfterLoad = following;
+        SetOpen(false);
+        Toast("LOADING " + SceneName(buildIndex).ToUpperInvariant());
+        SceneManager.LoadScene(buildIndex);
+    }
+
+    void DrawWorld()
+    {
+        Section("WORLDS IN THIS BUILD");
+        int n = SceneManager.sceneCountInBuildSettings;
+        int current = SceneManager.GetActiveScene().buildIndex;
+        if (n <= 1)
+        {
+            Hint(Application.isEditor
+                ? "In the editor, open another scene from the Project window. In a player build, every scene in the build is listed here."
+                : "This build has only one world.");
+            return;
+        }
+        for (int i = 0; i < n; i++)
+        {
+            GUILayout.BeginHorizontal(GUILayout.MinHeight(34));
+            bool here = i == current;
+            if (GUILayout.Button(here ? "CURRENT" : "LOAD", here ? sSegOn : sSegOff, GUILayout.Width(110), GUILayout.Height(30)) && !here) LoadWorld(i);
+            GUILayout.Space(12);
+            GUILayout.Label($"{SceneName(i)}  <color=#7a9499><size=13>{WorldBlurb(SceneName(i))}</size></color>", sLabel, GUILayout.Height(30));
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+        }
+        Hint("Loading a world resets it (ruts, rover position). The ROS connection stays up; topics come back once the new world starts.");
+    }
+
+    static string WorldBlurb(string scene)
+    {
+        switch (scene)
+        {
+            case "BadlandsTraversal": return "1.5 km URC/CIRC-style traversal: escarpment, wash, hoodoos, dunes. Mini rover, soil centre tile.";
+            case "UrcAutonomySite": return "The real URC 2027 autonomy square mile from lidar + aerial photo. chassis_24, stones, soil.";
+            case "SoilYard": return "Mini rover on test lanes of Utah soils: ruts, sinkage, ramps.";
+            case "ChassisPlayground": return "chassis_2024 with drops, slopes and a sand rock pit.";
+            case "WaypointTask": return "chassis_2024 with GPS, lidar and cameras: waypoint task.";
+            case "ArmScene": return "The arm on a table.";
+            case "SampleScene": return "Older all-in-one playground.";
+            default: return "";
+        }
     }
 
     void CaptureBaseFixedDt()
@@ -530,6 +603,7 @@ public class SimMenu : MonoBehaviour
             case 0: DrawControls(content.width - 20); break;
             case 1: DrawCamera(); break;
             case 2: DrawSoil(); break;
+            case 3: DrawWorld(); break;
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -559,7 +633,7 @@ public class SimMenu : MonoBehaviour
             {
                 new Hotkey { keys = Key(menuKey), action = "Open / close this menu", available = true },
                 new Hotkey { keys = "Q / E", action = "Previous / next tab (menu open)", available = true },
-                new Hotkey { keys = "1 2 3", action = "Jump to tab (menu open)", available = true },
+                new Hotkey { keys = "1 - " + Tabs.Length, action = "Jump to tab (menu open)", available = true },
             }),
             ("VIEW", new List<Hotkey>
             {
