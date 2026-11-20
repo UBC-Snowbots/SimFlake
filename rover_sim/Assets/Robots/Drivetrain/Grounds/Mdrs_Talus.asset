@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65ea568e61f89b673935602891860b8c, type: 3}
+  m_Name: Mdrs_Talus
+  m_EditorClassIdentifier: 
+  notes: 'MDRS talus under sandstone ledges: blocks in loose rubble, very rough.
+    Meant to be hard or impossible to drive. Copy of Utah_Gravel with rougher small-scale
+    relief (UrcSiteBuilder.GroundTable). Not measured on site.'
+  material: {fileID: 0}
+  rollingResistance: 0.08
+  kc: 0.1
+  kphi: 8000
+  n: 0.9
+  crustStrength: 20
+  cohesion: 0.3
+  frictionAngle: 38
+  shearModulus: 0.02
+  rubberFriction: 0.5
+  deformable: 1
+  density: 1750
+  reposeAngle: 38
+  compaction: 0.4
+  excavation: 0.25
+  roughnessFine: 0.008
+  roughnessCoarse: 0.16
+  disturbedDarkening: 0.18

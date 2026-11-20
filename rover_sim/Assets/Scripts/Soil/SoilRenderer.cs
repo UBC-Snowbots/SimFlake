@@ -35,7 +35,8 @@ public class SoilRenderer : MonoBehaviour
     static readonly int SoilTex = Shader.PropertyToID("_SoilTex"), SoilWindow = Shader.PropertyToID("_SoilWindow"),
         SoilParams = Shader.PropertyToID("_SoilParams"), NoiseTex = Shader.PropertyToID("_SoilNoiseTex"),
         NoiseScale = Shader.PropertyToID("_SoilNoiseScale"), ReliefTex = Shader.PropertyToID("_SoilReliefTex"),
-        TerrainRect = Shader.PropertyToID("_SoilTerrainRect");
+        TerrainRect = Shader.PropertyToID("_SoilTerrainRect"), MacroTex = Shader.PropertyToID("_MacroTex"),
+        MacroST = Shader.PropertyToID("_MacroST"), MacroOn = Shader.PropertyToID("_MacroOn");
 
     void OnEnable()
     {
@@ -112,6 +113,14 @@ public class SoilRenderer : MonoBehaviour
             Vector3 pos = t.transform.position, size = t.terrainData.size;
             block.SetVector(TerrainRect, new Vector4(pos.x, pos.z, 1f / size.x, 1f / size.z));
             if (st.ReliefTexture != null) block.SetTexture(ReliefTex, st.ReliefTexture);
+            // a terrain whose own material has a ground-colour map (SimFlake/SiteTerrain, UrcSite) keeps it under the soil shader
+            var own = original[t].mat;
+            if (own != null && own.HasProperty(MacroTex) && own.GetTexture(MacroTex) != null)
+            {
+                block.SetTexture(MacroTex, own.GetTexture(MacroTex));
+                block.SetVector(MacroST, own.GetVector(MacroST));
+                block.SetFloat(MacroOn, 1f);
+            }
             t.SetSplatMaterialPropertyBlock(block);
         }
         Shader.SetGlobalTexture(SoilTex, window);

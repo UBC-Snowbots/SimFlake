@@ -92,7 +92,8 @@ Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover
                Drivetrain/ (Motors/, Wheels/, Grounds/ spec assets, see Drive physics)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
 Scenes/        scenes (TaskWorlds/ for competition-style worlds, Tests/DriveTest = drivetrain test bench, SoilYard = soil lanes)
-Worlds/        per-world data: Badlands/ and ChassisPlayground/Generated/ are builder output (wiped on rebuild),
+Worlds/        per-world data: Badlands/, UrcSite/Generated/ and ChassisPlayground/Generated/ are builder output (wiped on
+               rebuild), UrcSite/Source/ is the processed real-world data the URC site is built from (keep),
                <Scene>/Terrain.asset are hand-made terrains, Skies/ the sky materials
 Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Soil/ (deformable ground + wheel-soil model), Sensors/,
                Environment/ (sky, ArUco), Tools/ (cameras, FPS, test node, bench), Editor/ (builders, SimFlakeTools)
@@ -183,6 +184,106 @@ Shrubs are terrain trees with capsule colliders (they block the rover and show o
 A rebuild rewrites ~40 MB of generated assets with new GUIDs, so commit rebuilds sparingly.
 The centre terrain is soil (ruts, sinkage: see Soil model). A rebuild drops that: run `SimFlake > Soil > Add Soil To Badlands`
 (`SoilYardBuilder.AddSoilToBadlands`) afterwards.
+
+`TaskWorlds/UrcAutonomySite` is the real place: the Utah state-owned square mile north of MDRS that the URC 2027 rules
+(1.e.xiii) name for the Autonomy Mission's route-finding sub-mission (38.411N -110.786E to 38.425N -110.768E), built from
+public data by `Editor/UrcSiteBuilder.cs` (menu `SimFlake > World Generation > Build URC Autonomy Site`, or `-executeMethod
+SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, ~6 s + import; it logs its checks).
+- **Frame:** x = east, z = north, metres from the centre of the square mile (38.418, -110.777 = UTM 12N 519467 E 4252218 N;
+  grid north, 0.14 deg off true north). y = elevation - 1375 m. `UrcSiteBuilder.LatLon(x, z)` gives the real coordinates.
+- **Real:** ground shape = USGS 3DEP 1 m lidar, unchanged (2048 m square, 2 x 2 terrains of 1025 samples; checked against the
+  file to 1.5 mm). Ground colour = NAIP aerial photo with sun shading, shadows and shrubs removed, drawn by
+  `Shaders/SiteTerrain` (terrain layers are grey detail textures, `albedo = layers * 2 * ground colour`; in Play
+  `SoilRenderer` passes the same map to the soil shaders). ~98,000 shrubs and ~5,000 boulders stand where the photo shows
+  them (shrubs wider than ~1 m have colliders). Backdrop = 16 km of 16 m DEM + Sentinel-2 colour, no collider.
+- **Our own assets (no ThirdParty packs in this world):** `python3 -s tools/urc_site/make_assets.py [shrubs]` draws the
+  textures into `Source/Layers` and `Source/Props` (~1.5 min; `shrubs` alone 4 s): a seamless detail + normal texture per soil
+  (crusted silt, rippled sand, popcorn bentonite, lag gravel, angular talus, bedded sandstone), the boulder rock texture and
+  the shrub card atlas. `Editor/UrcSiteProps.cs` makes the meshes at build time: seven shrub kinds (shadscale x 3, mat
+  saltbush, Mormon tea, bunch grass, dead shrub; ~25 triangles of cut-out cards each, shader `SimFlake/DesertShrub`) and 14
+  sandstone blocks (bedding-parallel slabs with fracture faces, convex colliders). Real in them: the colours of ground and
+  rock (measured in the photo, `site.json` / `Props/palette.csv`; each boulder takes the measured colour nearest to the ground
+  under it) and where each shrub and boulder stands. Not real: the close-up patterns (a 0.6 m photo can't show them; they are
+  modelled on how these surfaces look) and which species a shrub is (chosen by soil and size: mat saltbush on clay, grass and
+  small plants where the photo's blob is small). Pictures: `tools/urc_site/previews/assets_*.jpg`.
+- **Interpreted, not measured:** the soil map (`Source/soil_classes.png`, one of six per 1 m cell; rules in
+  `tools/urc_site/process_data.py`: sandstone = slope > 38 deg, talus = 24-38 deg or below a ledge, wash sand = drainage lines
+  from flow accumulation, bentonite = shrub-free coloured or sloping ground, gravel = convex crests and gully beds, hardpack =
+  the rest). Layer names pick the `GroundSpec` (`SoilSetup.ForLayer`). Picture: `tools/urc_site/previews/preview_soil.jpg`.
+- **Ground under 1 m (judgment, the lidar can't show it):** table `UrcSiteBuilder.GroundTable`, one row per soil class.
+  - *Relief:* the site has its own `GroundSpec`s (`Grounds/Mdrs_*.asset`, copies of the Utah ones; an existing asset is kept,
+    so tune in the inspector or delete it to get the table's values back) with `roughnessCoarse` 40-160 mm peak = 1-4 cm RMS
+    (the relief map's RMS is a quarter of its peak; the old 10-15 mm did nothing measurable). Anchor: profile roughness of
+    desert surfaces (Greeley et al., Death Valley: 0.5-1.5 cm RMS at particle scale, 4-6 cm on bouldery fans).
+  - *Stones:* `Scripts/Environment/StoneField.cs` (object `Stones` under `Generated World`). Stones exist only within 9 m
+    (5-15 cm) / 25 m (bigger) of the rovers and the main camera, are worked out from position + seed (same every run, nothing
+    in the scene file), and pushed loose stones stay where they ended up. Numbers and sizes follow the Mars rock
+    size-frequency law (Golombek & Rapp 1997: area covered by rocks >= D is `k exp(-q D)`, `q = 1.79 + 0.152 / k`) with the
+    rock abundance `k` and the largest stone per soil: hardpack 2 % / 12 cm (1.4 stones per m2), wash 3 % / 20 cm, clay 1 % /
+    12 cm, lag gravel 10 % / 15 cm, talus 20 % / 50 cm (7 per m2 + 1.6 bigger), sandstone 8 % / 40 cm. 30-60 % lie loose
+    (`LooseStone`: kinematic until touched, then a Rigidbody, 2300 kg/m3); the rest are embedded (fixed, 30-65 % buried).
+    No stones in the start lane and at task points (`clearZones`). Player flags: `--no-stones`, `--stone-abundance 2`.
+  - *Measured effect* (chassis_24, 1 m/s, `PlayShots`, smooth = `--no-stones --soil-relief 0`): flats 0.97 -> 0.95 m/s made
+    good, vertical acceleration 0.7 -> 1.8 m/s2 RMS, body rocking 4.5 -> 13 deg/s RMS. Straight at the T1 ridge from the
+    south-west it stalls on the talus toe after ~19 m either way (0.48 -> 0.41 m/s, climbs 1.5 -> 0.7 m).
+  - *Limits:* wheels meet stones with the rigid PhysX sphere, not the tyre model, so each hit is a one-step jolt (peaks of
+    40-200 m/s2 on the body: the IMU sees spikes a real tyre would soften; trust the RMS, not the peaks). Rills and vehicle
+    ruts are not modelled as channels (they'd need a direction field in the relief shader): clay slopes only get high
+    roughness. Shrubs and boulders stand on the plain terrain, so they can sit a few cm off the displaced surface.
+    Next step if the jolts matter: the plan below.
+- **Planned, not started: embedded stones in the soil height grid** (so the tyre model, with its rubber spring, meets them
+  instead of the rigid PhysX sphere). Estimate: 1-2 h of Claude working time if the wheel model stays stable on stone edges
+  (about 150 lines; most of the time is build + drive cycles of 3-5 min), up to half a day if it hops and needs model work.
+  Step 3 (the rig, 20 s per run) tells which case it is before anything else is built. Steps:
+  1. *Split `StoneField` into "which stones" and "make objects".* `Build` does both now. Move the generation into a pure
+     function `Generate(big, cx, cz)` returning structs (x, z, diameter, height, sink, rotation, loose, soil index), no Unity
+     objects, cached per patch in a `ConcurrentDictionary`: soil tiles are created inside `WheelSoilModel.Compute`, which
+     runs on worker threads, so it may only touch `SoilTerrain.BaseHeight / SpecAt / Roughness` (plain arrays, safe).
+     Keep the draw order of random numbers: the stones must stay where they are today.
+  2. *Add the stones to the soil base.* In `SoilField.GetOrCreate` the undisturbed height is `BaseHeight + SoilNoise.Relief`.
+     Add an optional hook (`ISoilBase.Stones(x0, z0, x1, z1)` or a delegate on `SoilField`) that returns the embedded stones
+     overlapping the tile (+ their radius), and for each cell under a stone raise `t.b` to the stone's exposed top: a cap
+     `exposed * sqrt(1 - (r / R)^2)` flattened for slabs, with the rim spread over at least 2 cells (a vertical step is what
+     made wheels hop before, see "Mistakes already made"). Set those cells' yield pressure `t.sy` very high (e.g. 5 MPa) so a
+     stone neither sinks nor ruts, and skip the "disturbed" mark there. Loose stones are NOT stamped: they move, they stay
+     PhysX bodies.
+  3. *Check the numerics on the wheel rig first.* Give `WheelRig` a `-stone <diameter>` option (one stone on the flat bed in
+     the wheel's path, `FlatSoil` needs the same hook) and compare hub height and force over the stone with what geometry
+     says, for `MiniRoverWheel` and `Chassis2024Wheel`, at High and Ultra, 0.3 and 1 m/s. Pass = no hop larger than the
+     stone, peak force a few times the wheel load, not tens. If it fails: widen the rim, or raise `stabilityFactor`.
+  4. *Stop the wheels hitting the stamped stones twice.* When soil is active, embedded stones keep their mesh and collider
+     (lidar, cameras and the chassis belly still need them) but each `DriveWheel` collider must ignore them:
+     `Physics.IgnoreCollision(wheelCollider, stoneCollider)` when `StoneField` takes a stone from its pool (wheel colliders:
+     `DriveWheel.myColliders`, expose them through a static list). Soil quality Off, or a terrain without `SoilTerrain`:
+     leave the PhysX contact as it is now.
+  5. *Presets.* Low has 2.5 cm cells: a 5 cm stone is two cells. Either stamp only stones over ~8 cm there or keep PhysX
+     stones at Low. Changing quality clears the grid; the stones come back identical because they are computed, not stored.
+  6. *Nothing to do in the shader:* the stone mesh covers its own bump (check that the tessellated relief does not poke
+     through small stones; if it does, write the bump into the soil window texture's deformation channel as well).
+  7. *Measure* with `PlayShots` on the same two drives as the table above (flats heading 135; `--play-shots-at -301,258
+     --play-shots-heading 45`), smooth / PhysX stones / stamped stones. Expected: speed and RMS about the same, vertical
+     acceleration peaks down from 40-200 m/s2 to a few tens. Also `tools/drive_bench.sh` on soil (no stones there: results
+     must not change) and soil ms per step (tile creation gets slower, steady state should not).
+  8. Update this section and the Soil model's "Known rough edges" (rocks would then be half done: stamped stones use the
+     tyre model, loose stones and boulders still the PhysX sphere).
+- **Made up:** the task layout (URC publishes targets at the competition), following rules 1.e.iv-xvi: C2 + start gate on the
+  real URC staging area (vehicle tracks in the photo), mission start on flat ground, astronaut figure, rock pick hammer
+  (Rigidbody), drone pad, T1 on a clay ridge 420 m away (+16 m; 26-30 deg from most sides, 22 deg straight in from the
+  south-west, 17 deg by the easiest winding route), T2 behind it without radio line of sight to the C2 mast. Also rocks
+  under ~1 m (see above). Change the constants at the top of the builder and rebuild.
+  Points are in `Worlds/UrcSite/waypoints.csv` (sim GNSS and true coordinates).
+- **Rovers:** `chassis_24` (active) and a mini_rover (inactive: same topics) start behind the gate. Their `LocationStuff`
+  origin is the real position of that spot, so `/gps/fix` reports real URC coordinates (flat-earth from the start: < 1.5 m off
+  the true grid inside the task area). The rovers, camera and anything else outside `Generated World` survive a rebuild.
+- **Data pipeline** (only to change the area or the rules; outputs are committed): `python3 -s tools/urc_site/fetch_data.py
+  <raw dir>` downloads the DEM (USGS ImageServer) and imagery (Planetary Computer; the USGS NAIP server timed out), then
+  `python3 -s tools/urc_site/process_data.py <raw dir>` (~30 s) writes `Worlds/UrcSite/Source`. `-s` because a pip numpy 2 in
+  `~/.local` breaks the system OpenCV. Then rebuild the world.
+- **Sizes:** generated assets 31 MB, scene 17 MB (5,000 boulder instances), source 24 MB. Splat maps are 2 m per texel because
+  terrain assets are stored as text. A rebuild changes GUIDs: commit rebuilds sparingly.
+- **Not done:** the astronaut does not walk (follow / come need a moving figure); no LED indicator on the rover; cliffs are as smooth as a 1 m DEM makes them (no overhangs); soil has not been checked
+  against the ground. The other missions (delivery, equipment servicing, astrobiology) would be separate scenes; the URC
+  North site of the same lidar tile is the obvious place for a delivery course.
 
 ## Drive physics (drivetrain model)
 Code in `Scripts/Robot/Drivetrain/`, data in `Assets/Robots/Drivetrain/`, setup in `Editor/DrivetrainSetup.cs`.
@@ -368,6 +469,9 @@ $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorT
 /tmp/simbuild/rover_sim.x86_64 -batchmode -nographics --rosbridge-url ws://127.0.0.1:9090 -logFile player.log &   # physics/sensors without a GPU window
 python3 tools/sim_check.py --drive          # topic rates + drives the rover and checks odom/GPS/IMU agree
 tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics and Soil model
+/tmp/simbuild/rover_sim.x86_64 -batchmode --play-shots <dir> [--play-shots-drive 1.0] [--play-shots-seconds 12] \
+   [--play-shots-at x,z] [--play-shots-heading 135]   # any scene in Play (needs graphics): the rover drives straight, the log
+                                             # gets speed made good + ride roughness, <dir> gets pictures (Tools/PlayShots.cs)
 ```
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.
@@ -400,6 +504,9 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
 - The arm listens on `/arm/command` directly (needs `rover_msgs`, i.e. RoverFlake2 sourced for rosbridge). The sim has no
   limit switches or differential wrist: 'H' drives axes back to the URDF zero, motor-space commands are treated as axis space.
   The HMI's status panels read `/arm/moteus_feedback`, which the sim does not publish (yet).
+- Terrain shaders hit the 16 sampler limit in some light variants (the error only shows in a player build log: "maximum
+  ps_4_0 sampler register index (16) exceeded"). `SoilTerrain.cginc` therefore declares layer textures with
+  `UNITY_DECLARE_TEX2D` and lets the normal maps and the ground-colour map borrow their samplers. Don't add `sampler2D`s there.
 - The scenes' `CompressedCameraCapture` components are disabled (team choice); enable them for a JPEG feed.
 
 ## Housekeeping

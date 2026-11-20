@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65ea568e61f89b673935602891860b8c, type: 3}
+  m_Name: Mdrs_WashSand
+  m_EditorClassIdentifier: 
+  notes: 'MDRS wash beds: loose sand with ripples and bars, cobbles lying loose.
+    Copy of Utah_LooseSand with rougher small-scale relief (UrcSiteBuilder.GroundTable).
+    Not measured on site.'
+  material: {fileID: 0}
+  rollingResistance: 0.2
+  kc: 0.99
+  kphi: 1528
+  n: 1.1
+  crustStrength: 0
+  cohesion: 1.04
+  frictionAngle: 30
+  shearModulus: 0.02
+  rubberFriction: 0.42
+  deformable: 1
+  density: 1550
+  reposeAngle: 33
+  compaction: 0.35
+  excavation: 0.5
+  roughnessFine: 0.003
+  roughnessCoarse: 0.04
+  disturbedDarkening: 0.14

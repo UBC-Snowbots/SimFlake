@@ -14,17 +14,24 @@ struct Input
 
 sampler2D _Control;
 float4 _Control_ST, _Control_TexelSize;
-sampler2D _Splat0, _Splat1, _Splat2, _Splat3;
+// Separate textures and samplers: each normal map and _MacroTex borrow a layer texture's sampler. With one sampler per
+// texture the forward passes went over the 16 sampler limit in some light variants.
+UNITY_DECLARE_TEX2D(_Splat0); UNITY_DECLARE_TEX2D(_Splat1); UNITY_DECLARE_TEX2D(_Splat2); UNITY_DECLARE_TEX2D(_Splat3);
 float4 _Splat0_ST, _Splat1_ST, _Splat2_ST, _Splat3_ST;
 half _Metallic0, _Metallic1, _Metallic2, _Metallic3;
 half _Smoothness0, _Smoothness1, _Smoothness2, _Smoothness3;
 #ifdef _NORMALMAP
-sampler2D _Normal0, _Normal1, _Normal2, _Normal3;
+UNITY_DECLARE_TEX2D_NOSAMPLER(_Normal0); UNITY_DECLARE_TEX2D_NOSAMPLER(_Normal1);
+UNITY_DECLARE_TEX2D_NOSAMPLER(_Normal2); UNITY_DECLARE_TEX2D_NOSAMPLER(_Normal3);
 float _NormalScale0, _NormalScale1, _NormalScale2, _NormalScale3;
 #endif
 #ifdef _ALPHATEST_ON
 sampler2D _TerrainHolesTexture;
 #endif
+
+UNITY_DECLARE_TEX2D_NOSAMPLER(_MacroTex);   // optional ground colour over a whole site (aerial photo, UrcSite): albedo = layers * 2 * macro
+float4 _MacroST;             // terrain uv -> macro uv (scale xy, offset zw)
+float _MacroOn;              // 0 when the terrain has no macro map (set per terrain by SoilRenderer)
 
 sampler2D _SoilTex;          // window around the rover: R = deformation (m), G = disturbed 0..1
 float4 _SoilWindow;          // xy = centre (world xz), z = 1 / window size (m), w = half size (m)
@@ -116,17 +123,19 @@ void SoilSurf(Input IN, inout SurfaceOutputStandard o)
     float2 uv0 = TRANSFORM_TEX(IN.tc.xy, _Splat0), uv1 = TRANSFORM_TEX(IN.tc.xy, _Splat1);
     float2 uv2 = TRANSFORM_TEX(IN.tc.xy, _Splat2), uv3 = TRANSFORM_TEX(IN.tc.xy, _Splat3);
     half4 mixed = 0;
-    mixed += splat_control.r * tex2D(_Splat0, uv0) * half4(1, 1, 1, _Smoothness0);
-    mixed += splat_control.g * tex2D(_Splat1, uv1) * half4(1, 1, 1, _Smoothness1);
-    mixed += splat_control.b * tex2D(_Splat2, uv2) * half4(1, 1, 1, _Smoothness2);
-    mixed += splat_control.a * tex2D(_Splat3, uv3) * half4(1, 1, 1, _Smoothness3);
+    mixed += splat_control.r * UNITY_SAMPLE_TEX2D(_Splat0, uv0) * half4(1, 1, 1, _Smoothness0);
+    mixed += splat_control.g * UNITY_SAMPLE_TEX2D(_Splat1, uv1) * half4(1, 1, 1, _Smoothness1);
+    mixed += splat_control.b * UNITY_SAMPLE_TEX2D(_Splat2, uv2) * half4(1, 1, 1, _Smoothness2);
+    mixed += splat_control.a * UNITY_SAMPLE_TEX2D(_Splat3, uv3) * half4(1, 1, 1, _Smoothness3);
+
+    mixed.rgb *= lerp(half3(1, 1, 1), 2.0 * UNITY_SAMPLE_TEX2D_SAMPLER(_MacroTex, _Splat0, IN.tc.xy * _MacroST.xy + _MacroST.zw).rgb, _MacroOn);
 
     fixed3 n = fixed3(0, 0, 1);
     #ifdef _NORMALMAP
-        n  = UnpackNormalWithScale(tex2D(_Normal0, uv0), _NormalScale0) * splat_control.r;
-        n += UnpackNormalWithScale(tex2D(_Normal1, uv1), _NormalScale1) * splat_control.g;
-        n += UnpackNormalWithScale(tex2D(_Normal2, uv2), _NormalScale2) * splat_control.b;
-        n += UnpackNormalWithScale(tex2D(_Normal3, uv3), _NormalScale3) * splat_control.a;
+        n  = UnpackNormalWithScale(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal0, _Splat0, uv0), _NormalScale0) * splat_control.r;
+        n += UnpackNormalWithScale(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal1, _Splat1, uv1), _NormalScale1) * splat_control.g;
+        n += UnpackNormalWithScale(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal2, _Splat2, uv2), _NormalScale2) * splat_control.b;
+        n += UnpackNormalWithScale(UNITY_SAMPLE_TEX2D_SAMPLER(_Normal3, _Splat3, uv3), _NormalScale3) * splat_control.a;
         n.z += 1e-5f;
     #endif
 
