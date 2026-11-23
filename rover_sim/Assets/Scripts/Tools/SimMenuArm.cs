@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// Esc menu, arm parts: WORLD > ROVER > CONFIGURATION (what the rover carries: nothing / arm / rover lab), the arm's
+/// Esc menu, arm parts: ROVER AND WORLD > ROVER > CONFIGURATION (what the rover carries: nothing / arm / rover lab), the arm's
 /// state + FIX ARM, the ADVANCED > ARM page (stepper specs, gripper, breakage strengths, live loads), and a toast when
 /// a link breaks.
 /// </summary>
@@ -14,7 +14,7 @@ public partial class SimMenu
 
     void OnArmBroke(ArmBreakage arm, ArmBreakage.Link l)
     {
-        Toast($"ARM BROKE: {ArmBreakage.NiceName(l.name).ToUpperInvariant()} ({l.brokeBecause})  ·  FIX: ESC > WORLD");
+        Toast($"ARM BROKE: {ArmBreakage.NiceName(l.name).ToUpperInvariant()} ({l.brokeBecause})  ·  FIX: ESC > ROVER AND WORLD");
     }
 
     void ApplyPendingConfig()
@@ -106,7 +106,7 @@ public partial class SimMenu
         var arm = CurrentArm();
         if (arm == null)
         {
-            Hint("No arm in this scene. Mount one on chassis_2024: WORLD > ROVER > CONFIGURATION > ARM. ArmScene has one on a table.");
+            Hint("No arm in this scene. Mount one on chassis_2024: ROVER AND WORLD > ROVER > CONFIGURATION > ARM. ArmScene has one on a table.");
             return;
         }
         var ac = arm.GetComponent<ArmController>();

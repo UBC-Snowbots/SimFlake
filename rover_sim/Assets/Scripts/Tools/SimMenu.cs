@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
-/// SOIL (soil model quality, ruts), WORLD (swap the rover for another kind, arm, environment: time of day and weather,
+/// SOIL (soil model quality, ruts), ROVER AND WORLD (swap the rover for another kind, arm, environment: time of day and weather,
 /// load another scene of the build). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
@@ -146,7 +146,7 @@ public partial class SimMenu : MonoBehaviour
     // ---------------------------------------------------------------- state
     bool open;
     int tab;
-    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "WORLD" };
+    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "ROVER AND WORLD" };
     Vector2 scroll;
     string toast; float toastUntil;
 
@@ -766,9 +766,13 @@ public partial class SimMenu : MonoBehaviour
         // Tabs.
         float tabY = panel.y + 78;
         if (advanced) { DrawAdvanced(panel, x0, tabY); DrawFooter(panel, x0); return; }
-        float tabW = 140;
+        float tabX = x0;
         for (int i = 0; i < Tabs.Length; i++)
-            if (GUI.Button(new Rect(x0 + i * (tabW + 6), tabY, tabW, 32), $"{Tabs[i]}", i == tab ? sTabOn : sTabOff)) { tab = i; scroll = Vector2.zero; }
+        {
+            float tabW = Mathf.Max(140, sTabOff.CalcSize(new GUIContent(Tabs[i])).x + 28);
+            if (GUI.Button(new Rect(tabX, tabY, tabW, 32), Tabs[i], i == tab ? sTabOn : sTabOff)) { tab = i; scroll = Vector2.zero; }
+            tabX += tabW + 6;
+        }
         if (GUI.Button(new Rect(panel.xMax - 208, tabY, 180, 32), "ADVANCED  ▸", sTabOff)) { advanced = true; scroll = Vector2.zero; FindRovers(); }
         Fill(new Rect(panel.x + 12, tabY + 32, panel.width - 24, 2), Cyan);
 

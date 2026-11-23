@@ -289,7 +289,7 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
 ## In-game menu and cameras
 `Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with four tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
 (Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
-shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. WORLD swaps the rover (ROVER > MODEL), shows the arm, has an ENVIRONMENT section
+shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ROVER AND WORLD swaps the rover (ROVER > MODEL), shows the arm, has an ENVIRONMENT section
 (the scene's `SkyEnvironment` time of day and weather, no hotkeys on purpose) and loads another scene of the build.
   Before loading a scene it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
   objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
@@ -549,7 +549,7 @@ physics + breakage strengths and the chassis_2024 mount). Tests: `tools/arm_test
 - **ArmScene** has a Main Camera with `FreeFlyCamera` (it had no camera at all); V follows the arm (SimMenu's fallback when there
   is no rover: root articulation bodies). It also has a `SkyEnvironment` (midday): without one a player build has no ambient
   light or reflections there (the editor shows them anyway) and the arm's 75 % metallic URDF materials render almost black.
-- **Menu**: WORLD > ROVER > CONFIGURATION, WORLD > ARM (state, FIX ARM, breakage on/off), ADVANCED > ARM (per-axis torque / lost
+- **Menu**: ROVER AND WORLD > ROVER > CONFIGURATION, ROVER AND WORLD > ARM (state, FIX ARM, breakage on/off), ADVANCED > ARM (per-axis torque / lost
   steps / stall, squeeze, strengths with live and peak load, gripper, pads, motor specs). A toast says what broke.
 - **Not done**: rover lab; rotor inertia and backlash; the wrist differential (motor-space commands are still treated as axis space);
   `/arm/moteus_feedback`; arm vs its own rover's body is not a break cause tested yet. `MotorController` finds wheels with a global
