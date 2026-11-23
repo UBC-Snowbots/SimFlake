@@ -16,8 +16,12 @@ namespace SimFlake.EditorTools
         const string Root = "Assets/Robots/Arm";
         const string ArmPrefab = Root + "/Arm.prefab";
         const string ChassisPrefab = "Assets/Robots/Chassis/chassis_2024.prefab";
-        /// <summary>Arm base (link_0) on chassis_link: on the deck (top at y = 0.01), centred, ahead of the middle.</summary>
-        public static readonly Vector3 MountPosition = new Vector3(0f, 0.01f, 0.10f);
+        /// <summary>Arm base (link_0) on chassis_link, found from the meshes: the arm's base plate (underside at link_0 y = 10.0 cm,
+        /// motor hole at (0, 0), wire hole at z = -13.25 cm) flat on the chassis mounting plate (top at y = 1.1 cm, holes at
+        /// x = 0.25 cm, z = 20.25 and 7.0 cm), motor down through the front hole.</summary>
+        public static readonly Vector3 MountPosition = new Vector3(0.0025f, -0.089f, 0.2025f);
+        static readonly Vector3 OldMountPosition = new Vector3(0f, 0.01f, 0.10f);
+        const string ArmScene = "Assets/Scenes/ArmScene.unity";
 
         [MenuItem("SimFlake/Arm/Set Up Arm (motors, gripper, breakage, chassis_2024 mount)", priority = 260)]
         public static void SetUpMenu() { if (SetUp()) Debug.Log("[ArmSetup] done"); }
@@ -64,6 +68,7 @@ namespace SimFlake.EditorTools
             var pad = EnsurePadMaterial();
             bool ok = SetUpArmPrefab(specs, pad);
             ok &= SetUpChassisMount();
+            ok &= SetUpArmScene();
             AssetDatabase.SaveAssets();
             return ok;
         }
@@ -150,6 +155,7 @@ namespace SimFlake.EditorTools
                     foreach (var c in t.GetComponentsInChildren<Collider>(true))
                         if (c.attachedArticulationBody == t.GetComponent<ArticulationBody>()) c.sharedMaterial = pad;
                 }
+                EnsureArmCamera(root);
                 var brk = root.GetComponent<ArmBreakage>();
                 if (brk == null) brk = root.AddComponent<ArmBreakage>();
                 // Strengths live in ArmBreakage.DefaultLinks (measured, see there); tune live in Esc > ADVANCED > ARM.
@@ -181,6 +187,7 @@ namespace SimFlake.EditorTools
                     mount.localPosition = MountPosition;
                     mount.localRotation = Quaternion.identity;
                 }
+                else if (Vector3.Distance(mount.localPosition, OldMountPosition) < 1e-4f) mount.localPosition = MountPosition; // first guess, before the plates were matched
                 var p = root.GetComponent<RoverPayload>();
                 if (p == null) p = root.AddComponent<RoverPayload>();
                 p.armMount = mount;
@@ -190,6 +197,57 @@ namespace SimFlake.EditorTools
                 return true;
             }
             finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        /// <summary>Wrist camera on link_6 (turns with the gripper), like the rover's "Movable Camera": a small box + a child
+        /// Camera. Created only if missing, so a position set in the editor is kept.</summary>
+        static void EnsureArmCamera(GameObject root)
+        {
+            var link6 = Find(root.transform, "link_6");
+            if (link6 == null || Find(root.transform, "Arm Camera") != null) return;
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            body.name = "Arm Camera";
+            body.transform.SetParent(link6, false);
+            body.transform.localPosition = new Vector3(0.06f, 0.08f, 0f);
+            body.transform.localRotation = Quaternion.LookRotation(Vector3.up, Vector3.right);   // looks along the gripper (+y of link_6)
+            body.transform.localScale = new Vector3(0.04f, 0.03f, 0.03f);
+            var r = body.GetComponent<MeshRenderer>();
+            r.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Material.mat");
+            var lens = new GameObject("arm_cam");
+            lens.transform.SetParent(body.transform, false);
+            lens.transform.localPosition = new Vector3(0, 0, 0.6f);   // front face of the box
+            lens.transform.localScale = new Vector3(1 / 0.04f, 1 / 0.03f, 1 / 0.03f);
+            var cam = lens.AddComponent<Camera>();
+            cam.nearClipPlane = 0.02f;
+            cam.fieldOfView = 60f;
+            var cap = body.AddComponent<RGBCameraCapture>();
+            cap.rgbCamera = cam;
+            cap.width = 640; cap.height = 480; cap.fps = 15;
+            cap.frameid = "arm_camera_link";
+            cap.imageTopic = "/arm/camera/image_raw";
+            cap.cameraInfoTopic = "/arm/camera/camera_info";
+            Debug.Log("[ArmSetup] added Arm Camera on link_6 (/arm/camera/image_raw)");
+        }
+
+        /// <summary>ArmScene had no camera at all: add a MainCamera with the free-fly controls (V = follow the arm).</summary>
+        static bool SetUpArmScene()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(ArmScene);
+            foreach (var c in UnityEngine.Object.FindObjectsOfType<Camera>())
+                if (c.CompareTag("MainCamera")) return true;
+            var arm = UnityEngine.Object.FindObjectOfType<ArmController>();
+            Vector3 look = arm != null ? arm.transform.position + new Vector3(0, 0.15f, 0.45f) : Vector3.up;
+            var go = new GameObject("Main Camera");
+            go.tag = "MainCamera";
+            go.AddComponent<Camera>().nearClipPlane = 0.05f;
+            go.AddComponent<AudioListener>();
+            go.AddComponent<FreeFlyCamera>();
+            go.transform.position = look + new Vector3(1.3f, 0.6f, -1.1f);
+            go.transform.LookAt(look);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+            bool ok = UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+            Debug.Log("[ArmSetup] ArmScene: added Main Camera (free fly, V = follow)");
+            return ok;
         }
 
         static Transform Find(Transform root, string name)

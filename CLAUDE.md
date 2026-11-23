@@ -531,11 +531,19 @@ physics + breakage strengths and the chassis_2024 mount). Tests: `tools/arm_test
   / 53 / 63 N·m (rigid wheel contacts give single-step 200-450 m/s² jolts, see URC limits); the shoulder pushing the gripper into the
   ground at stall breaks the forearm (120); a 40 kg box dropped 1 m on the forearm breaks base + forearm; a 3 m/s wall hit usually
   breaks nothing (steppers skip and the arm folds back).
-- **Mounting** (`RoverPayload` on chassis_2024's root, `ArmMount` child of chassis_link at (0, 0.01, 0.10) on the deck, move it in
-  the prefab): configuration None / Arm / RoverLab (not modelled, refused). Default None, so scenes and benches are unchanged. The arm
+- **Mounting** (`RoverPayload` on chassis_2024's root, `ArmMount` child of chassis_link at (0.0025, -0.089, 0.2025)): the arm's base
+  plate sits flat on the chassis mounting plate with the motor down through the front hole and the wire holes lined up (both 13.25 cm
+  apart; found from the meshes, see `ArmSetup.MountPosition`). ArmSetup only moves an existing mount if it is still at the first guess,
+  so a hand-tuned position survives. Configuration None / Arm / RoverLab (not modelled, refused). Default None, so scenes and benches are unchanged. The arm
   joins the rover's articulation (fixed joint): adding/removing it rebuilds the articulation, tested while driving (no effect beyond
   one step). Rover + arm 39.9 kg (URDF arm ~5 kg; the team's ~15 kg arm is the bench's `chassis_2024_arm` payload). The mini rover has
   no RoverPayload. Players: `--rover-config arm`.
+- **Arm camera**: `Arm Camera` on link_6 (turns with the wrist): `RGBCameraCapture` on `/arm/camera/image_raw` + `camera_info`,
+  frame `arm_camera_link`, 640x480 at 15 Hz (two raw 30 Hz streams would be near rosbridge's limit). It is part of Arm.prefab, so a
+  mounted arm, FIX ARM and ArmScene all have it where the prefab puts it: position it in ArmScene, then apply the overrides to the
+  prefab. ArmSetup only creates it if missing.
+- **ArmScene** has a Main Camera with `FreeFlyCamera` (it had no camera at all); V follows the arm (SimMenu's fallback when there
+  is no rover: root articulation bodies).
 - **Menu**: WORLD > ROVER > CONFIGURATION, WORLD > ARM (state, FIX ARM, breakage on/off), ADVANCED > ARM (per-axis torque / lost
   steps / stall, squeeze, strengths with live and peak load, gripper, pads, motor specs). A toast says what broke.
 - **Not done**: rover lab; rotor inertia and backlash; the wrist differential (motor-space commands are still treated as axis space);

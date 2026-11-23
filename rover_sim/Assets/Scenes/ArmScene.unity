@@ -10357,6 +10357,114 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   geometryType: 0
+--- !u!1 &1108655849
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1108655853}
+  - component: {fileID: 1108655852}
+  - component: {fileID: 1108655851}
+  - component: {fileID: 1108655850}
+  m_Layer: 0
+  m_Name: Main Camera
+  m_TagString: MainCamera
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1108655850
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1108655849}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3a486b9f8274c41d848d6a46de668a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speed: 10
+  fastMultiplier: 5
+  lookSensitivity: 3
+--- !u!81 &1108655851
+AudioListener:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1108655849}
+  m_Enabled: 1
+--- !u!20 &1108655852
+Camera:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1108655849}
+  m_Enabled: 1
+  serializedVersion: 2
+  m_ClearFlags: 1
+  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_projectionMatrixMode: 1
+  m_GateFitMode: 2
+  m_FOVAxisMode: 0
+  m_Iso: 200
+  m_ShutterSpeed: 0.005
+  m_Aperture: 16
+  m_FocusDistance: 10
+  m_FocalLength: 50
+  m_BladeCount: 5
+  m_Curvature: {x: 2, y: 11}
+  m_BarrelClipping: 0.25
+  m_Anamorphism: 0
+  m_SensorSize: {x: 36, y: 24}
+  m_LensShift: {x: 0, y: 0}
+  m_NormalizedViewPortRect:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  near clip plane: 0.05
+  far clip plane: 1000
+  field of view: 60
+  orthographic: 0
+  orthographic size: 5
+  m_Depth: 0
+  m_CullingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_RenderingPath: -1
+  m_TargetTexture: {fileID: 0}
+  m_TargetDisplay: 0
+  m_TargetEye: 3
+  m_HDR: 1
+  m_AllowMSAA: 1
+  m_AllowDynamicResolution: 0
+  m_ForceIntoRT: 0
+  m_OcclusionCulling: 1
+  m_StereoConvergence: 10
+  m_StereoSeparation: 0.022
+--- !u!4 &1108655853
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1108655849}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.15292002, y: -0.41472724, z: 0.070924155, w: 0.8941961}
+  m_LocalPosition: {x: 1.484, y: 1.777, z: -1.786}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1116134592
 GameObject:
   m_ObjectHideFlags: 8
@@ -22109,14 +22217,6 @@ MonoBehaviour:
   - link_4
   - link_5
   - link_6
-  torque:
-  - 300
-  - 30
-  - 30
-  - 40
-  - 40
-  - 40
-  ee_torque: 200
   armJoints:
   - {fileID: 586667244}
   - {fileID: 1428169302}
@@ -22126,6 +22226,19 @@ MonoBehaviour:
   - {fileID: 1201822266}
   endEffectorLeftJoint: {fileID: 0}
   endEffectorRightJoint: {fileID: 0}
+  motors:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  eeMetersPerDegree: 0.0005
+  fingerStiffness: 15
+  armGravity: 1
+  solverIterations: 30
+  solverVelocityIterations: 20
   armCommandTopicName: /arm/command
   motorTopicName: /arm/sim_command
   jointStatesTopicName: /joint_states
@@ -22139,7 +22252,6 @@ MonoBehaviour:
   - joint_4
   - joint_5
   - joint_6
-  eeMetersPerDegree: 0.0005
   maxSpeedDegPerSec:
   - 36
   - 36
@@ -22149,7 +22261,6 @@ MonoBehaviour:
   - 36
   - 180
   positionGain: 4
-  jointDriveDamping: 1000
 --- !u!114 &1978296906
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22185,6 +22296,7 @@ MonoBehaviour:
   track_width_meters: 0.8
   autoMeasureGeometry: 1
   turnSlipFactor: 2.3
+  commandTimeout: 0.5
   publishOdometry: 1
   odomTopic: /odom
   odomFrame: odom
@@ -25024,3 +25136,4 @@ SceneRoots:
   - {fileID: 1694086548}
   - {fileID: 1053343811}
   - {fileID: 264834336}
+  - {fileID: 1108655853}
