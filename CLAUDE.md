@@ -287,10 +287,10 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
   North site of the same lidar tile is the obvious place for a delivery course.
 
 ## In-game menu and cameras
-`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with five tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
+`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with four tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
 (Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
-shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ENVIRONMENT has the scene's `SkyEnvironment` time of day and weather
-(no hotkeys on purpose). WORLD swaps the rover (ROVER > MODEL) and loads another scene of the build.
+shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. WORLD swaps the rover (ROVER > MODEL), shows the arm, has an ENVIRONMENT section
+(the scene's `SkyEnvironment` time of day and weather, no hotkeys on purpose) and loads another scene of the build.
   Before loading a scene it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
   objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
 - Rover swap (`Scripts/Robot/RoverCatalog.cs`): the list is `Resources/RoverCatalog.asset` (label + prefab; being in Resources puts

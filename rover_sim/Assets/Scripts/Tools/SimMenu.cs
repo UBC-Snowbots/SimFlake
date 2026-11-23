@@ -6,8 +6,8 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
-/// SOIL (soil model quality, ruts), ENVIRONMENT (time of day, weather), WORLD (swap the rover for another kind, load
-/// another scene of the build). V toggles the follow camera without opening the menu.
+/// SOIL (soil model quality, ruts), WORLD (swap the rover for another kind, arm, environment: time of day and weather,
+/// load another scene of the build). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
 /// and the soil demo are unaffected). Settings are runtime only; in the editor, graphics quality settings are put back
@@ -146,7 +146,7 @@ public partial class SimMenu : MonoBehaviour
     // ---------------------------------------------------------------- state
     bool open;
     int tab;
-    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "ENVIRONMENT", "WORLD" };
+    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "WORLD" };
     Vector2 scroll;
     string toast; float toastUntil;
 
@@ -213,7 +213,7 @@ public partial class SimMenu : MonoBehaviour
         SetFollow(true);
     }
 
-    // ---------------------------------------------------------------- tab: environment
+    // ---------------------------------------------------------------- environment (WORLD tab)
 
     static readonly string[] TimeNames = { "SUNRISE", "MIDDAY", "SUNSET", "NIGHT" };
     static readonly string[] WeatherNames = { "CLEAR", "CLOUDY" };
@@ -222,7 +222,7 @@ public partial class SimMenu : MonoBehaviour
     void DrawEnvironment()
     {
         if (sky == null) sky = FindObjectOfType<SkyEnvironment>();
-        Section("SKY");
+        Section("ENVIRONMENT");
         if (sky == null)
         {
             Hint("This scene has no Sky Environment object, so time of day and weather are fixed. " +
@@ -330,6 +330,7 @@ public partial class SimMenu : MonoBehaviour
     {
         DrawRover();
         DrawArmStatus();
+        DrawEnvironment();
         Section("WORLDS IN THIS BUILD");
         int n = SceneManager.sceneCountInBuildSettings;
         int current = SceneManager.GetActiveScene().buildIndex;
@@ -780,8 +781,7 @@ public partial class SimMenu : MonoBehaviour
             case 0: DrawControls(content.width - 20); break;
             case 1: DrawCamera(); break;
             case 2: DrawSoil(); break;
-            case 3: DrawEnvironment(); break;
-            case 4: DrawWorld(); break;
+            case 3: DrawWorld(); break;
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
