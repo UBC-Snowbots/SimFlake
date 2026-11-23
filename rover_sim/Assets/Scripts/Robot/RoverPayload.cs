@@ -69,8 +69,36 @@ public class RoverPayload : MonoBehaviour
         arm.transform.localRotation = Quaternion.identity;
         arm.SetActive(true);
         Destroy(staging);
-        Debug.Log($"[RoverPayload] {name}: arm mounted");
+        int n = IgnoreOverlaps(arm, out string what);
+        Debug.Log($"[RoverPayload] {name}: arm mounted" + (n > 0 ? $"; it overlaps {what} where it is mounted, so those don't collide with it" : ""));
         return true;
+    }
+
+    /// <summary>Rover colliders that the arm already overlaps in its mounted pose (a scene may have moved a sensor onto the
+    /// deck, e.g. ChassisPlayground's camera) would push on it with the full solver force and break it at once: those pairs
+    /// are left out. Everything else on the rover still collides with the arm.</summary>
+    int IgnoreOverlaps(GameObject arm, out string what)
+    {
+        Physics.SyncTransforms();
+        var armCols = arm.GetComponentsInChildren<Collider>();
+        var names = new System.Collections.Generic.HashSet<string>();
+        int pairs = 0;
+        foreach (var r in GetComponentsInChildren<Collider>())
+        {
+            if (r.isTrigger || !r.enabled || r.transform.IsChildOf(arm.transform)) continue;
+            var rb = r.bounds;
+            rb.Expand(0.02f);
+            foreach (var a in armCols)
+            {
+                if (!a.enabled || !a.bounds.Intersects(rb)) continue;
+                if (!Physics.ComputePenetration(a, a.transform.position, a.transform.rotation, r, r.transform.position, r.transform.rotation, out _, out _)) continue;
+                Physics.IgnoreCollision(a, r);
+                names.Add(r.name);
+                pairs++;
+            }
+        }
+        what = string.Join(", ", names);
+        return pairs;
     }
 
     void Clear()

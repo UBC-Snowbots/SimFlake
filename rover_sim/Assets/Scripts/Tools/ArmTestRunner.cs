@@ -60,6 +60,7 @@ public class ArmTestRunner : MonoBehaviour
         ground.transform.position = Origin + new Vector3(0, -0.5f, 0);
         ground.transform.localScale = new Vector3(200, 1, 200);
 
+        if (only != null && only.Contains("scene")) { yield return SceneRover(); only.Remove("scene"); if (only.Count == 0) { Finish(); yield break; } }
         if (Run("hold")) yield return Hold();
         if (Run("move")) yield return Move();
         if (Run("limit")) yield return Limit();
@@ -71,10 +72,42 @@ public class ArmTestRunner : MonoBehaviour
         if (Run("swapdrive")) yield return SwapWhileDriving();
         if (Run("hold")) yield return Hold();
 
+        Finish();
+    }
+
+    void Finish()
+    {
         Log("SUMMARY");
         foreach (var s in summary) Log("  " + s);
         Log($"done: {summary.Count - failures}/{summary.Count} passed");
         Application.Quit(failures == 0 ? 0 : 1);
+    }
+
+    // The scene's own rover (not the test area): attach the arm the way the Esc menu does, a few seconds in.
+    IEnumerator SceneRover()
+    {
+        Log("== scene: attach the arm to the scene's rover");
+        var payload = FindObjectOfType<RoverPayload>();
+        if (payload == null) { Check(false, "scene: no RoverPayload in this scene"); yield break; }
+        var rover = payload.gameObject;
+        var body = RoverSwap.Body(rover);
+        float oldScale = Time.timeScale; Time.timeScale = 1f;
+        for (float t = 0; t < 3f; t += Time.deltaTime) yield return null;   // like a person opening the menu
+        Log("before: " + Pose(rover, body) + $" pos {body.position.ToString("F2")}");
+        Vector3 p0 = body.position;
+        payload.Apply(RoverPayload.Configuration.Arm);
+        float maxV = 0, maxW = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            yield return new WaitForFixedUpdate();
+            var ab = body.GetComponent<ArticulationBody>();
+            maxV = Mathf.Max(maxV, ab.velocity.magnitude); maxW = Mathf.Max(maxW, ab.angularVelocity.magnitude);
+            if (i < 5 || i % 50 == 0) Log($"  step {i}: {Pose(rover, body)} v {ab.velocity.magnitude:0.00} w {ab.angularVelocity.magnitude:0.00}");
+        }
+        Time.timeScale = oldScale;
+        var br = payload.Arm;
+        Check(br != null && !br.AnyBroken && maxV < 0.5f && Vector3.Distance(p0, body.position) < 0.2f,
+              $"scene: arm attaches quietly (max chassis speed {maxV:0.00} m/s, spin {maxW:0.00} rad/s, moved {Vector3.Distance(p0, body.position):0.00} m, broken: {(br == null ? "no arm" : string.Join(",", br.links.Where(l => l.broken).Select(l => l.name)))})");
     }
 
     // ---------------------------------------------------------------- helpers
