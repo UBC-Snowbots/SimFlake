@@ -229,25 +229,37 @@ namespace SimFlake.EditorTools
             Debug.Log("[ArmSetup] added Arm Camera on link_6 (/arm/camera/image_raw)");
         }
 
-        /// <summary>ArmScene had no camera at all: add a MainCamera with the free-fly controls (V = follow the arm).</summary>
+        /// <summary>ArmScene had no camera and no runtime lighting: add a MainCamera with the free-fly controls (V = follow
+        /// the arm) and a SkyEnvironment (midday). Without the latter a player has no ambient light or reflections in this
+        /// scene (the editor shows them anyway), and the arm's 75 % metallic URDF materials render nearly black.</summary>
         static bool SetUpArmScene()
         {
             var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(ArmScene);
+            bool hasCam = false;
             foreach (var c in UnityEngine.Object.FindObjectsOfType<Camera>())
-                if (c.CompareTag("MainCamera")) return true;
-            var arm = UnityEngine.Object.FindObjectOfType<ArmController>();
-            Vector3 look = arm != null ? arm.transform.position + new Vector3(0, 0.15f, 0.45f) : Vector3.up;
-            var go = new GameObject("Main Camera");
-            go.tag = "MainCamera";
-            go.AddComponent<Camera>().nearClipPlane = 0.05f;
-            go.AddComponent<AudioListener>();
-            go.AddComponent<FreeFlyCamera>();
-            go.transform.position = look + new Vector3(1.3f, 0.6f, -1.1f);
-            go.transform.LookAt(look);
+                if (c.CompareTag("MainCamera")) hasCam = true;
+            if (!hasCam)
+            {
+                var arm = UnityEngine.Object.FindObjectOfType<ArmController>();
+                Vector3 look = arm != null ? arm.transform.position + new Vector3(0, 0.15f, 0.45f) : Vector3.up;
+                var go = new GameObject("Main Camera");
+                go.tag = "MainCamera";
+                go.AddComponent<Camera>().nearClipPlane = 0.05f;
+                go.AddComponent<AudioListener>();
+                go.AddComponent<FreeFlyCamera>();
+                go.transform.position = look + new Vector3(1.3f, 0.6f, -1.1f);
+                go.transform.LookAt(look);
+                Debug.Log("[ArmSetup] ArmScene: added Main Camera (free fly, V = follow)");
+            }
+            if (UnityEngine.Object.FindObjectOfType<SkyEnvironment>() == null)
+            {
+                var env = SkyBuilder.Apply(SkyBuilder.Mountains);
+                env.Set(SkyEnvironment.TimeOfDay.Midday, SkyEnvironment.Weather.Clear);
+                EditorUtility.SetDirty(env);
+                Debug.Log("[ArmSetup] ArmScene: added Sky Environment (midday)");
+            }
             UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-            bool ok = UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
-            Debug.Log("[ArmSetup] ArmScene: added Main Camera (free fly, V = follow)");
-            return ok;
+            return UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
         }
 
         static Transform Find(Transform root, string name)
