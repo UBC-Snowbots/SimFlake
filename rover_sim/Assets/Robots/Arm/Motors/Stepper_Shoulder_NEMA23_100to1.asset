@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd0f424083ed0e696a3aea10dc9d5be0, type: 3}
+  m_Name: Stepper_Shoulder_NEMA23_100to1
+  m_EditorClassIdentifier: 
+  holdingTorque: 1.9
+  stepAngle: 1.8
+  cornerSpeedRpm: 300
+  maxSpeedRpm: 750
+  torqueAtMaxSpeed: 0.4
+  detentTorque: 0.06
+  runCurrent: 1
+  holdCurrent: 1
+  accelerationRpmPerSec: 1500
+  gearRatio: 100
+  gearEfficiency: 0.8
+  outputStiffness: 100
+  dampingRatio: 0.6
+  notes: "Axis 2 (shoulder). Estimate: NEMA 23 (1.9 N\xB7m) + 100:1 -> ~150 N\xB7m
+    (arm alone needs ~20 N\xB7m held straight out), 45 deg/s."

@@ -81,21 +81,22 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 | `/scan` | sensor_msgs/LaserScan | `HorizontalLidarScanner`: 10 Hz, CCW, +inf = no hit |
 | `/camera/image_raw`, `/camera/camera_info` | Image, CameraInfo | `RGBCameraCapture` |
 | `/camera/image/compressed` | CompressedImage | `CompressedCameraCapture` |
-| `/arm/command` (sub) | rover_msgs/ArmCommand | `ArmController`: same topic/contract as the real arm driver (`arm_commands.h`): 'V' jog deg/s, 'P' position in output revs, 'S', 'Z', 'H', 'G'. NaN = leave that axis alone, index 6 = end effector. No sim_helper needed |
+| `/arm/command` (sub) | rover_msgs/ArmCommand | `ArmController`: same topic/contract as the real arm driver (`arm_commands.h`): 'V' jog deg/s, 'P' position in output revs, 'S', 'Z', 'H', 'G'. NaN = leave that axis alone, index 6 = end effector. No sim_helper needed. Axes are steppers (see Arm) |
 | `/arm/sim_command`, `/arm/ee_command/sim` (sub) | Float64MultiArray, Float64 | `ArmController`: legacy sim_helper topics, ignored while `/arm/command` is active |
 | `/joint_states`, `/arm/sim_feedback` | JointState, Float64MultiArray | `ArmController` |
 | `/chatter` / `/listener` | std_msgs/String | `testnode` (connection test, SampleScene) |
 
 ## Folder layout (`rover_sim/Assets`)
 ```
-Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/Arm.prefab, Descriptions/ (URDF packages),
+Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/ (Arm.prefab, Motors/ stepper specs,
+               GripperPad material), Descriptions/ (URDF packages),
                Drivetrain/ (Motors/, Wheels/, Grounds/ spec assets, see Drive physics)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
 Scenes/        scenes (TaskWorlds/ for competition-style worlds, Tests/DriveTest = drivetrain test bench, SoilYard = soil lanes)
 Worlds/        per-world data: Badlands/, UrcSite/Generated/ and ChassisPlayground/Generated/ are builder output (wiped on
                rebuild), UrcSite/Source/ is the processed real-world data the URC site is built from (keep),
                <Scene>/Terrain.asset are hand-made terrains, Skies/ the sky materials
-Scripts/       Ros/ (bridge client), Robot/ (motor/arm control), Soil/ (deformable ground + wheel-soil model), Sensors/,
+Scripts/       Ros/ (bridge client), Robot/ (motor/arm control; Arm/ = steppers, breakage), Soil/ (deformable ground + wheel-soil model), Sensors/,
                Environment/ (sky, ArUco), Tools/ (cameras, FPS, test node, bench), Editor/ (builders, SimFlakeTools)
 Materials/, Shaders/, Resources/   ours
 ThirdParty/    Asset Store / downloaded packs, unchanged (HQ Rocks, klen, TerrainSampleAssets, ...)
@@ -491,6 +492,56 @@ Read in this order: `WheelSoilModel.cs` (class comment, then `Compute`), `SoilFi
 - **Good next steps:** measure frame rate per preset with graphics (iGPU and RTX 3060); give chassis_2024 a treaded STL and
   retest on slickrock; rays against rocks so tyres squash on them; calibrate against the real mini rover.
 
+## Arm (steppers, gripper, breakage, mounting)
+Code: `Scripts/Robot/ArmController.cs` (topics, commands), `Robot/Arm/` (`StepperMotorSpec`, `StepperDrive`, `ArmBreakage`,
+`ArmLinkContacts`), `Robot/RoverPayload.cs` (mounting), setup `Editor/ArmSetup.cs` (menu `SimFlake > Arm > Set Up Arm`, or
+`-executeMethod SimFlake.EditorTools.ArmSetup.SetUpFromCommandLine`: creates missing specs, keeps existing ones, rewrites Arm.prefab's
+physics + breakage strengths and the chassis_2024 mount). Tests: `tools/arm_test.sh [--no-build] [-- --arm-test-only hold,move,limit,geom,grip,drop,push,rover,swapdrive]`
+(builds ArmScene, runs `Tools/ArmTestRunner.cs` headless in its own test area, ~4 min, PASS/FAIL list; `--arm-test-nobreak` +
+`PEAKS` lines = peak loads per joint, `--arm-test-trace`, `--arm-break-filter`, `--arm-test-ramps`).
+- **Steppers** (one `StepperDrive` per axis, gripper = one motor driving both fingers). Spec per axis in `Robots/Arm/Motors/`
+  (`StepperMotorSpec`: holding torque, step angle, pull-out curve, run/hold current, gear ratio/efficiency, output stiffness of
+  gearbox + link, damping). **All values are estimates** (NEMA 17/23 + planetary sized to carry the URDF masses: base 50, shoulder
+  150, elbow 50, forearm roll 10, wrist 18, wrist roll 5 N·m, gripper ~40 N squeeze per finger, ~45 deg/s): put in the real arm's.
+  Model: torque = `T sin(Nr (field - rotor))` with a massless overdamped rotor in series with the flex spring; past half an electrical
+  period the rotor drops a pole (lost steps, counted), so overload = stall + buzz at the limit, not more force. The PhysX drive gets
+  the flex force with target = predicted position + force / stiffness (implicit stiffness only resists change within a step, the
+  same trick as the soil model: stable for any gearbox stiffness at 5 ms). Velocity commands are open loop (lost steps stay lost);
+  'P' moves close the loop on the joint position like before. Feedback topics publish the true joint angles.
+- **Gripper**: closing on something builds force through the finger flex (`ArmController.fingerStiffness`, N/mm) until the motor
+  stalls; when the command stops the field stays put, so it keeps squeezing (test: 37-38 N held 2 s with no command, a 1 kg box
+  holds). Finger pads `GripperPad` (1.0/0.9, Maximum combine). This URDF's fingers close from 183 mm to ~57 mm at EE +122 deg (the
+  joint named finger_left_joint moves finger_right). A cube pinched on two faces can pivot about the pinch line.
+- **Fixed in the prefab** (ArmSetup): the import had gravity off on every link and `Velocity` drives (ignore damping);
+  `ee_base_link` / `link_tt` had no inertial (Unity gave 1 kg, 1 kg·m²: the wrist was ~5000x too heavy to turn). Now gravity on,
+  Force drives, 0.05 / 0.005 kg.
+- **Collisions**: every arm object is on layer 8 `RoverArm`, which doesn't collide with itself (layer matrix in
+  DynamicsManager). Don't go back to `Physics.IgnoreCollision` pairs: link_6 has 466 VHACD hulls and each call re-filters the whole
+  body (~10 s for the arm). Changing a collider's layer at runtime costs the same, so the layer is set in the prefab. The arm does
+  collide with the rover (link_0 not with chassis_link: parent/child in one articulation) and the world.
+- **Breakage** (`ArmBreakage` on the arm root): load through each joint by Newton-Euler over everything beyond it (sum of
+  m (a - g) from position differences, I alpha + w x I w, minus contact forces from collision impulses; PhysX 4 has no joint reaction
+  forces). Checked: static loads = carried weight to 0.1 N, a box resting on the forearm adds its weight. Revolute joints count
+  bending only (their own axis stalls instead), fingers the side force; fingers take moments about their COM (their URDF frames are
+  far from the parts). Low-pass `filterTime` 0.1 s, nothing breaks in the first second. A broken link + everything beyond it is
+  reparented to the scene root (own articulation, unpowered, drives = detent brake); axes beyond it report no power.
+  `Repair()` swaps in a spare copy taken in Awake (home pose), carries over the menu settings, destroys debris.
+  Strengths (`ArmBreakage.DefaultLinks`, estimates, set from measured peaks): mount 300, base 250, shoulder 180, elbow 90, forearm 100,
+  wrist 30, wrist roll 25, gripper mount 25, fingers 6 N·m. Measured (0.1 s filter): sharp 4 cm steps at 1 m/s peak at 200 / 75 / 122
+  / 53 / 63 N·m (rigid wheel contacts give single-step 200-450 m/s² jolts, see URC limits); the shoulder pushing the gripper into the
+  ground at stall breaks the forearm (120); a 40 kg box dropped 1 m on the forearm breaks base + forearm; a 3 m/s wall hit usually
+  breaks nothing (steppers skip and the arm folds back).
+- **Mounting** (`RoverPayload` on chassis_2024's root, `ArmMount` child of chassis_link at (0, 0.01, 0.10) on the deck, move it in
+  the prefab): configuration None / Arm / RoverLab (not modelled, refused). Default None, so scenes and benches are unchanged. The arm
+  joins the rover's articulation (fixed joint): adding/removing it rebuilds the articulation, tested while driving (no effect beyond
+  one step). Rover + arm 39.9 kg (URDF arm ~5 kg; the team's ~15 kg arm is the bench's `chassis_2024_arm` payload). The mini rover has
+  no RoverPayload. Players: `--rover-config arm`.
+- **Menu**: WORLD > ROVER > CONFIGURATION, WORLD > ARM (state, FIX ARM, breakage on/off), ADVANCED > ARM (per-axis torque / lost
+  steps / stall, squeeze, strengths with live and peak load, gripper, pads, motor specs). A toast says what broke.
+- **Not done**: rover lab; rotor inertia and backlash; the wrist differential (motor-space commands are still treated as axis space);
+  `/arm/moteus_feedback`; arm vs its own rover's body is not a break cause tested yet. `MotorController` finds wheels with a global
+  `GameObject.Find` (two chassis_2024 in one frame pick up each other's wheels; RoverSwap deactivates the old one first).
+
 ## Importing URDFs
 Package `com.unity.robotics.urdf-importer` v0.5.2 (git URL in `Packages/manifest.json`, downloads automatically).
 Copy the ROS description package into `Assets/Robots/Descriptions/`, right-click the `.urdf` and choose **Import Robot from Selected URDF
@@ -543,7 +594,8 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
   `RosBridgeLauncher` now runs with `set +m` and SIGKILLs the whole session on stop. If topics vanish, check the
   `[rosbridge] starting rosbridge (... ROS_DOMAIN_ID=...)` line in the Console.
 - The arm listens on `/arm/command` directly (needs `rover_msgs`, i.e. RoverFlake2 sourced for rosbridge). The sim has no
-  limit switches or differential wrist: 'H' drives axes back to the URDF zero, motor-space commands are treated as axis space.
+  limit switches or differential wrist: 'H' drives axes back to the URDF zero (driving into a joint limit stalls the stepper and
+  loses steps, like the real one), motor-space commands are treated as axis space.
   The HMI's status panels read `/arm/moteus_feedback`, which the sim does not publish (yet).
 - Terrain shaders hit the 16 sampler limit in some light variants (the error only shows in a player build log: "maximum
   ps_4_0 sampler register index (16) exceeded"). `SoilTerrain.cginc` therefore declares layer textures with

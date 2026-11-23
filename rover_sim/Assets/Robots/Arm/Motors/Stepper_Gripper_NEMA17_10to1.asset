@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd0f424083ed0e696a3aea10dc9d5be0, type: 3}
+  m_Name: Stepper_Gripper_NEMA17_10to1
+  m_EditorClassIdentifier: 
+  holdingTorque: 0.45
+  stepAngle: 1.8
+  cornerSpeedRpm: 300
+  maxSpeedRpm: 360
+  torqueAtMaxSpeed: 0.5
+  detentTorque: 0.015
+  runCurrent: 1
+  holdCurrent: 1
+  accelerationRpmPerSec: 1500
+  gearRatio: 10
+  gearEfficiency: 0.5
+  outputStiffness: 15
+  dampingRatio: 0.6
+  notes: "End effector. Estimate: NEMA 17 (0.45 N\xB7m) + 10:1 into the finger drive
+    (0.5 mm of finger travel per output degree, efficiency 0.5 for the screw/rack)
+    -> ~40 N squeeze per finger at stall, full stroke in ~1 s. Output stiffness is
+    not used here: the finger flex is ArmController.fingerStiffness."

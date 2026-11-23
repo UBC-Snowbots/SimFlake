@@ -7,7 +7,7 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// Esc menu > ADVANCED: every runtime knob of the drivetrain, tyres, rover body, soil and physics, for quick tests.
+/// Esc menu > ADVANCED: every runtime knob of the drivetrain, tyres, rover body, soil, physics and the arm (SimMenuArm.cs), for quick tests.
 /// Nothing is saved. Spec assets (motors, wheels, grounds, physic materials) and global physics settings are put back
 /// when the sim quits, so in the editor a test never changes the project; components reset with Play mode anyway.
 ///
@@ -19,7 +19,7 @@ public partial class SimMenu
 {
     bool advanced;
     int advTab;
-    static readonly string[] AdvTabs = { "MOTORS", "WHEELS & TYRES", "ROVER BODY", "SOIL", "PHYSICS" };
+    static readonly string[] AdvTabs = { "MOTORS", "WHEELS & TYRES", "ROVER BODY", "SOIL", "PHYSICS", "ARM" };
 
     class Knob
     {
@@ -312,7 +312,7 @@ public partial class SimMenu
         }
         if (editKey != null && GUI.GetNameOfFocusedControl() != "knob:" + editKey) CommitEdit();
 
-        float tabW = 132;
+        float tabW = 124;
         for (int i = 0; i < AdvTabs.Length; i++)
             if (GUI.Button(new Rect(x0 + i * (tabW + 6), tabY, tabW, 32), AdvTabs[i], i == advTab ? sTabOn : sTabOff)) { advTab = i; scroll = Vector2.zero; GUI.FocusControl(null); }
         if (GUI.Button(new Rect(panel.xMax - 208, tabY, 180, 32), "◂  MAIN MENU", sTabOff)) { advanced = false; scroll = Vector2.zero; GUI.FocusControl(null); }
@@ -323,7 +323,7 @@ public partial class SimMenu
         Fill(new Rect(x0, y, w, 46), new Color(1f, 0.68f, 0.18f, 0.12f));
         Fill(new Rect(x0, y, 4, 46), Orange);
         GUI.Label(new Rect(x0 + 14, y + 3, w - 160, 22), "<b>NOTHING HERE IS SAVED.</b>  Quick tests only: every change is lost when Play stops or the sim closes.", sWarn);
-        GUI.Label(new Rect(x0 + 14, y + 23, w - 160, 20), "To change a rover for good, edit its spec assets in the Unity editor (Assets/Robots/Drivetrain).", sDim);
+        GUI.Label(new Rect(x0 + 14, y + 23, w - 160, 20), "To change a rover for good, edit its spec assets in the Unity editor (Assets/Robots/Drivetrain, Assets/Robots/Arm/Motors).", sDim);
         if (GUI.Button(new Rect(x0 + w - 140, y + 9, 130, 28), "RESET ALL", sSegOff)) ResetAllKnobs();
 
         var rover = rovers.Count > 0 && roverIndex < rovers.Count && rovers[roverIndex] != null ? rovers[roverIndex].root.gameObject : null;
@@ -337,6 +337,7 @@ public partial class SimMenu
             case 2: AdvBody(rover); break;
             case 3: AdvSoil(rover); break;
             case 4: AdvPhysics(); break;
+            case 5: AdvArm(); break;
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();

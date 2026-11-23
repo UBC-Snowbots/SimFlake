@@ -174,6 +174,7 @@ public partial class SimMenu : MonoBehaviour
         SceneManager.sceneLoaded += OnSceneLoaded;
         CaptureBaseFixedDt();
         RoverSwap.Snapshot();
+        ArmBreakage.Broke += OnArmBroke;
     }
 
     // Fullscreen below the desktop resolution ("downscaled viewport") on Linux: the mouse positions Unity reports don't
@@ -190,6 +191,7 @@ public partial class SimMenu : MonoBehaviour
     void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
+        ArmBreakage.Broke -= OnArmBroke;
         if (Instance == this) Instance = null;
     }
 
@@ -309,9 +311,9 @@ public partial class SimMenu : MonoBehaviour
     void DrawRover()
     {
         var cat = RoverCatalog.Load();
-        if (cat == null || cat.rovers.Count < 2) return;
         Section("ROVER");
         if (rovers.Count == 0) { Hint("No rover in this scene."); return; }
+        if (cat == null || cat.rovers.Count < 2) { DrawConfiguration(); return; }
         int cur = cat.IndexOf(rovers[roverIndex].root.gameObject);
         var labels = new string[cat.rovers.Count];
         for (int i = 0; i < labels.Length; i++) labels[i] = cat.rovers[i].label;
@@ -321,11 +323,13 @@ public partial class SimMenu : MonoBehaviour
         if (n != cur && n >= 0) pendingSwap = n;
         Hint("Swaps the rover where it stands (same spot and heading); the world is not reloaded. Both rovers use the same " +
              "topics. /gps/fix carries on, /odom starts again from zero." + (rovers.Count > 1 ? " Pick which rover in CAMERA > ROVER." : ""));
+        DrawConfiguration();
     }
 
     void DrawWorld()
     {
         DrawRover();
+        DrawArmStatus();
         Section("WORLDS IN THIS BUILD");
         int n = SceneManager.sceneCountInBuildSettings;
         int current = SceneManager.GetActiveScene().buildIndex;
@@ -358,7 +362,7 @@ public partial class SimMenu : MonoBehaviour
             case "SoilYard": return "Mini rover on test lanes of Utah soils: ruts, sinkage, ramps.";
             case "ChassisPlayground": return "chassis_2024 with drops, slopes and a sand rock pit.";
             case "WaypointTask": return "chassis_2024 with GPS, lidar and cameras: waypoint task.";
-            case "ArmScene": return "The arm on a table.";
+            case "ArmScene": return "The arm on a table, with blocks to pick up.";
             case "SampleScene": return "Older all-in-one playground.";
             default: return "";
         }
@@ -375,6 +379,7 @@ public partial class SimMenu : MonoBehaviour
         fps = Mathf.Lerp(fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 1e-4f), 0.05f);
 
         if (pendingSwap >= 0) { int k = pendingSwap; pendingSwap = -1; SwapRover(k); }
+        ApplyPendingConfig();
         KeyboardDrive();
         if (Input.GetKeyDown(menuKey)) SetOpen(!open);
         if (open && GUIUtility.keyboardControl != 0) { } // typing into a field (advanced menu): no hotkeys
