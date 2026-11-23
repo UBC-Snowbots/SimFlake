@@ -312,6 +312,10 @@ public class ArmBreakage : MonoBehaviour
         fresh.transform.localRotation = homeLocalRot;
         if (homeParent == null && gameObject.scene.IsValid()) SceneManager.MoveGameObjectToScene(fresh, gameObject.scene);
         fresh.SetActive(true);   // the spare was copied before anything moved: home pose, same mount settings
+        // On a rover: leave out the rover parts it overlaps again (RoverPayload.Apply did that for the old colliders only;
+        // without it the solver pushes e.g. a camera on the deck plate out of the arm and the fresh arm breaks at once).
+        var payload = homeParent != null ? homeParent.GetComponentInParent<RoverPayload>() : null;
+        if (payload != null) payload.Mounted(fresh);
         Destroy(gameObject);
         Debug.Log("[ArmBreakage] arm repaired");
         return fb;

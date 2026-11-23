@@ -104,10 +104,22 @@ public class ArmTestRunner : MonoBehaviour
             maxV = Mathf.Max(maxV, ab.velocity.magnitude); maxW = Mathf.Max(maxW, ab.angularVelocity.magnitude);
             if (i < 5 || i % 50 == 0) Log($"  step {i}: {Pose(rover, body)} v {ab.velocity.magnitude:0.00} w {ab.angularVelocity.magnitude:0.00}");
         }
-        Time.timeScale = oldScale;
         var br = payload.Arm;
         Check(br != null && !br.AnyBroken && maxV < 0.5f && Vector3.Distance(p0, body.position) < 0.2f,
               $"scene: arm attaches quietly (max chassis speed {maxV:0.00} m/s, spin {maxW:0.00} rad/s, moved {Vector3.Distance(p0, body.position):0.00} m, broken: {(br == null ? "no arm" : string.Join(",", br.links.Where(l => l.broken).Select(l => l.name)))})");
+
+        // FIX ARM (what the menu button does) must keep it intact too: the fresh arm needs the same overlap exclusions.
+        if (br != null) { br.Break(br.links.First(l => l.name == "link_2")); br = br.Repair(); }
+        p0 = body.position; maxV = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            yield return new WaitForFixedUpdate();
+            maxV = Mathf.Max(maxV, body.GetComponent<ArticulationBody>().velocity.magnitude);
+        }
+        Time.timeScale = oldScale;
+        br = payload.Arm;
+        Check(br != null && !br.AnyBroken && maxV < 0.5f && Vector3.Distance(p0, body.position) < 0.2f,
+              $"scene: FIX ARM on the scene's rover stays intact (max chassis speed {maxV:0.00} m/s, broken: {(br == null ? "no arm" : string.Join(",", br.links.Where(l => l.broken).Select(l => l.name)))})");
     }
 
     // ---------------------------------------------------------------- helpers

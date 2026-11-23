@@ -537,7 +537,7 @@ physics + breakage strengths and the chassis_2024 mount). Tests: `tools/arm_test
   so a hand-tuned position survives. Configuration None / Arm / RoverLab (not modelled, refused). On mounting, rover colliders the
   arm already overlaps (the chassis hulls around the sunk motor; ChassisPlayground's camera override sits on the deck plate) are
   excluded from colliding with the arm, else the solver pushes them apart at full force and the arm breaks at once
-  (`RoverPayload.IgnoreOverlaps`, logged). `tools/arm_test.sh` only uses the prefab; `--arm-test-only scene` in a player of a real
+  (`RoverPayload.IgnoreOverlaps`, logged; FIX ARM redoes it for the fresh copy via `RoverPayload.Mounted`). `tools/arm_test.sh` only uses the prefab; `--arm-test-only scene` in a player of a real
   scene attaches the arm to that scene's rover. Default None, so scenes and benches are unchanged. The arm
   joins the rover's articulation (fixed joint): adding/removing it rebuilds the articulation, tested while driving (no effect beyond
   one step). Rover + arm 39.9 kg (URDF arm ~5 kg; the team's ~15 kg arm is the bench's `chassis_2024_arm` payload). The mini rover has

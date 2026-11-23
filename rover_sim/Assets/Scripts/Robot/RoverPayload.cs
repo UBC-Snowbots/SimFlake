@@ -69,9 +69,16 @@ public class RoverPayload : MonoBehaviour
         arm.transform.localRotation = Quaternion.identity;
         arm.SetActive(true);
         Destroy(staging);
-        int n = IgnoreOverlaps(arm, out string what);
-        Debug.Log($"[RoverPayload] {name}: arm mounted" + (n > 0 ? $"; it overlaps {what} where it is mounted, so those don't collide with it" : ""));
+        Mounted(arm, "arm mounted");
         return true;
+    }
+
+    /// <summary>Call when an arm has been put on the mount by other code (FIX ARM swaps in a fresh copy): collisions left out
+    /// with <see cref="Physics.IgnoreCollision"/> belong to the old colliders, so the new ones need the same treatment.</summary>
+    public void Mounted(GameObject arm, string what = "arm replaced")
+    {
+        int n = IgnoreOverlaps(arm, out string parts);
+        Debug.Log($"[RoverPayload] {name}: {what}" + (n > 0 ? $"; it overlaps {parts} where it is mounted, so those don't collide with it" : ""));
     }
 
     /// <summary>Rover colliders that the arm already overlaps in its mounted pose (a scene may have moved a sensor onto the
