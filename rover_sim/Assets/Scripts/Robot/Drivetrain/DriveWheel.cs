@@ -241,6 +241,10 @@ public class DriveWheel : MonoBehaviour
 
         UpdateElectrical(dt);
 
+        // The spec can change at runtime (SimMenu ADVANCED): keep PhysX's spin cap above the motor's no-load speed.
+        float spinCap = motor.NoLoadWheelSpeed * 2f + 10f;
+        if (body.maxAngularVelocity < spinCap) body.maxAngularVelocity = spinCap;
+
         // Controller: ramp the setpoint, never beyond what the motor can reach.
         float maxStep = motor.maxWheelAcceleration * dt;
         float target = Mathf.Clamp(TargetSpeed, -motor.NoLoadWheelSpeed, motor.NoLoadWheelSpeed);

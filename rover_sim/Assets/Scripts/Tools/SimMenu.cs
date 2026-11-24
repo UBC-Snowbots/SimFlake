@@ -883,7 +883,7 @@ public partial class SimMenu : MonoBehaviour
                 if (keyboardDrive)
                 {
                     Row("SPEED", 120);
-                    keyboardSpeed = Slider(keyboardSpeed, 0.1f, 2f, "{0:0.0} m/s", colW - 240);
+                    keyboardSpeed = Slider(keyboardSpeed, 0.1f, 10f, "{0:0.0} m/s", colW - 240);
                     EndRow();
                     Row("TURN RATE", 120);
                     keyboardTurnRate = Slider(keyboardTurnRate, 0.2f, 2f, "{0:0.0} rad/s", colW - 240);
