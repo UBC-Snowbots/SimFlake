@@ -371,6 +371,9 @@ public partial class SimMenu
                     $"Per wheel: peak <b>{m.PeakWheelTorque:0.00} N·m</b>, continuous {m.ContinuousWheelTorque:0.00} N·m.  " +
                     $"Six wheels push at most ~{6 * m.PeakWheelTorque / Mathf.Max(r, 1e-3f):0} N.");
             if (!string.IsNullOrEmpty(m.notes)) Hint(m.notes);
+            Readout($"Speed ramp (maxWheelAcceleration {m.maxWheelAcceleration:0} rad/s² = {m.maxWheelAcceleration * r:0.0} m/s²): " +
+                    $"<b>{m.NoLoadWheelSpeed / Mathf.Max(m.maxWheelAcceleration, 1e-3f):0.00} s</b> from 0 to top speed, and the same to stop. " +
+                    "Raise it with the motor or the rover feels laggy at high speed.");
             Hint("The wheels follow the COMMANDED speed (/cmd_vel, or CONTROLS > KEYBOARD DRIVE speed x2 with Shift). A faster motor " +
                  "only shows when the command asks for more than the old top speed, or on climbs and in soil where torque runs out.");
             Fields(m, skip: null, fixedFields: new[] { "rotorInertia", "gearheadInertia" }, fixedNote: "added to the wheels' inertia at start");

@@ -127,8 +127,9 @@ public class MotorController : MonoBehaviour
             Debug.Log($"[MotorController] wheel drive: type {wheelJoints[0].jointType}, stiffness {d.stiffness}, damping {d.damping}, forceLimit {d.forceLimit}");
         }
 
-        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, CmdVelCallback));
-        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback));
+        // queue_length 1: only the newest command matters, a backlog in rosbridge would only add lag.
+        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, CmdVelCallback, queueLength: 1));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback, queueLength: 1));
 
         if (publishOdometry)
         {
