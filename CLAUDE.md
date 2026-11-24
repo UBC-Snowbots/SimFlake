@@ -33,12 +33,7 @@ Roadmap (wanted, not started; don't do these unless asked):
 - **ROS connection = rosbridge.** `ros-jazzy-rosbridge-suite` (apt) is the only ROS-side dependency, and nothing gets built.
   The Unity side is our own small client in `rover_sim/Assets/Scripts/Ros/` with no packages or native plugins.
   Unity starts rosbridge automatically when you press Play (if nothing is already on port 9090) and stops it afterwards.
-  It then also starts a second one, `rosbridge_streams` on 9091, for the camera sockets (`RosConnection`): rosbridge is one
-  Python process, and a raw 640x480 30 Hz stream (~37 MB/s of base64 JSON) left it too busy to forward fast `/cmd_vel` (sim_check
-  published ~230 Hz: commands arrived seconds late or never, so turning by ROS "did nothing"; measured on one shared rosbridge
-  with the camera on: 60 Hz fine, 100 Hz up to 0.4 s late, 150 Hz 2 s, 230 Hz nothing). A rosbridge that is already running
-  (yours, a launch file, a test's on its own domain) is shared by the streams as before; `--rosbridge-stream-url <url>` /
-  `SIMFLAKE_ROSBRIDGE_STREAM_URL` sends them elsewhere. In `-nographics` cameras send nothing, so headless tests never saw this.
+  It also starts `rosbridge_streams` on 9091 for the cameras (else fast `/cmd_vel` starves): see `claude/rosbridge-camera-starvation.md`.
   If Unity was started from a terminal with ROS sourced, rosbridge gets that terminal's environment.
   Otherwise it goes through `bash -i`, i.e. `~/.bashrc`, so `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION` and the RoverFlake2
   overlay match your terminals.
@@ -623,6 +618,9 @@ tools/drive_bench.sh                         # drivetrain test bench (no ROS), s
 ```
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.
+
+## Issue notes
+Detailed write-ups of investigated issues live in `claude/` (index: `claude/README.md`); add new ones there with a one-line pointer here.
 
 ## Gotchas found during the Jazzy migration
 - rosbridge's JSON (ujson) escapes `/` as `\/`. Envelope strings go through `RosJson.Unquote`; JsonUtility handles it in bodies.
