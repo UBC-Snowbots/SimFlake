@@ -27,8 +27,10 @@ namespace SimFlake.Ros
         /// <summary>Counts frames queued for one publisher so it can drop when it falls behind.</summary>
         internal sealed class PendingCounter { public int Value; }
 
-        readonly Uri uri;
+        Uri uri;
         readonly string name;
+        /// <summary>Where it connects; can be changed until <see cref="Start"/>.</summary>
+        public Uri Uri { get => uri; set => uri = value; }
         readonly ConcurrentQueue<Frame> queue = new ConcurrentQueue<Frame>();
         readonly SemaphoreSlim signal = new SemaphoreSlim(0);
         readonly CancellationTokenSource cts = new CancellationTokenSource();

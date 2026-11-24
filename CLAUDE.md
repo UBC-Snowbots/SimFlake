@@ -33,6 +33,12 @@ Roadmap (wanted, not started; don't do these unless asked):
 - **ROS connection = rosbridge.** `ros-jazzy-rosbridge-suite` (apt) is the only ROS-side dependency, and nothing gets built.
   The Unity side is our own small client in `rover_sim/Assets/Scripts/Ros/` with no packages or native plugins.
   Unity starts rosbridge automatically when you press Play (if nothing is already on port 9090) and stops it afterwards.
+  It then also starts a second one, `rosbridge_streams` on 9091, for the camera sockets (`RosConnection`): rosbridge is one
+  Python process, and a raw 640x480 30 Hz stream (~37 MB/s of base64 JSON) left it too busy to forward fast `/cmd_vel` (sim_check
+  published ~230 Hz: commands arrived seconds late or never, so turning by ROS "did nothing"; measured on one shared rosbridge
+  with the camera on: 60 Hz fine, 100 Hz up to 0.4 s late, 150 Hz 2 s, 230 Hz nothing). A rosbridge that is already running
+  (yours, a launch file, a test's on its own domain) is shared by the streams as before; `--rosbridge-stream-url <url>` /
+  `SIMFLAKE_ROSBRIDGE_STREAM_URL` sends them elsewhere. In `-nographics` cameras send nothing, so headless tests never saw this.
   If Unity was started from a terminal with ROS sourced, rosbridge gets that terminal's environment.
   Otherwise it goes through `bash -i`, i.e. `~/.bashrc`, so `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION` and the RoverFlake2
   overlay match your terminals.
@@ -608,7 +614,7 @@ $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorT
 $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorTools.SimFlakeTools.BuildLinux \
    -scenes Assets/Scenes/TaskWorlds/WaypointTask.unity -out /tmp/simbuild/rover_sim.x86_64 -logFile build.log
 /tmp/simbuild/rover_sim.x86_64 -batchmode -nographics --rosbridge-url ws://127.0.0.1:9090 -logFile player.log &   # physics/sensors without a GPU window
-python3 tools/sim_check.py --drive          # topic rates + drives the rover and checks odom/GPS/IMU agree
+python3 tools/sim_check.py --drive          # topic rates + drives the rover (cmd_vel at 20 Hz) and checks odom/GPS/IMU agree
 tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics and Soil model
 /tmp/simbuild/rover_sim.x86_64 -batchmode --play-shots <dir> [--play-shots-drive 1.0] [--play-shots-seconds 12] \
    [--play-shots-at x,z] [--play-shots-heading 135]   # any scene in Play (needs graphics): the rover drives straight, the log

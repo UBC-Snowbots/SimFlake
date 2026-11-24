@@ -152,6 +152,15 @@ namespace SimFlake.Ros
         [Tooltip("If nothing is listening at the URL above (and it is localhost), start rosbridge automatically using your ~/.bashrc ROS environment. It is stopped again when the sim stops.")]
         public bool autoLaunchRosbridge = true;
 
+        // Camera streams go through their own rosbridge process. rosbridge is one Python process: decoding a raw
+        // 640x480 stream (~37 MB/s of base64 JSON at 30 Hz) keeps it at 85-100 % CPU, and then fast publishers stall the
+        // other way (measured, /cmd_vel: 60 Hz fine, 100 Hz up to 0.4 s late, 150 Hz 2 s, 230 Hz nothing arrives; sim_check
+        // published ~230 Hz and turning by ROS looked broken). When the sim launches rosbridge itself it also launches "rosbridge_streams" on the next
+        // port. When a rosbridge is already running (started by you or a launch file, maybe on another domain), the
+        // streams share it, as before, unless --rosbridge-stream-url / SIMFLAKE_ROSBRIDGE_STREAM_URL says otherwise.
+        Uri streamUri;                                   // null until decided
+        readonly List<RosBridgeSocket> pendingStreams = new List<RosBridgeSocket>();
+
         [Tooltip("Show a small connection indicator in the corner of the Game view.")]
         public bool showStatusOverlay = true;
 
@@ -207,10 +216,24 @@ namespace SimFlake.Ros
             if (!string.IsNullOrEmpty(url)) rosbridgeUrl = url;
             uri = new Uri(rosbridgeUrl);
 
+            string streamUrl = Environment.GetEnvironmentVariable("SIMFLAKE_ROSBRIDGE_STREAM_URL");
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == "--rosbridge-stream-url") streamUrl = args[i + 1];
+            streamUri = !string.IsNullOrEmpty(streamUrl) ? new Uri(streamUrl) : null;
+
             main = NewSocket("rosbridge", MainHandshake);
             main.OnText = HandleIncoming;
             // Give an already-running rosbridge a moment to answer before launching our own.
             launchAfter = autoLaunchRosbridge && uri.IsLoopback ? Time.realtimeSinceStartup + 1.5f : -1;
+            if (launchAfter < 0 && streamUri == null) SetStreamUri(uri);
+        }
+
+        void SetStreamUri(Uri u)
+        {
+            streamUri = u;
+            if (u != uri) Debug.Log($"[ROS] camera streams go through {u} (control topics: {uri})");
+            foreach (var s in pendingStreams) { s.Uri = u; s.Start(); }
+            pendingStreams.Clear();
         }
 
         RosBridgeSocket NewSocket(string name, Func<List<string>> handshake, bool start = true)
@@ -249,7 +272,8 @@ namespace SimFlake.Ros
             var sock = NewSocket("rosbridge:" + topic, null, start: false);
             var dpub = new RosPublisher<T>(topic, queueSize, sock);
             sock.Handshake = () => new List<string> { dpub.AdvertiseOp() };
-            sock.Start();
+            if (streamUri != null) { sock.Uri = streamUri; sock.Start(); }
+            else pendingStreams.Add(sock);                      // until we know whether there is a streams rosbridge
             return dpub;
         }
 
@@ -274,6 +298,7 @@ namespace SimFlake.Ros
             {
                 socket.Dispose();
                 sockets.Remove(socket);
+                pendingStreams.Remove(socket);
                 return;
             }
             lock (registryLock) mainAdverts.Remove(advertiseOp);
@@ -334,7 +359,17 @@ namespace SimFlake.Ros
             if (launchAfter > 0 && Time.realtimeSinceStartup > launchAfter)
             {
                 launchAfter = -1;
-                if (!main.Connected) RosBridgeLauncher.Launch(uri.Port);
+                if (!main.Connected)
+                {
+                    RosBridgeLauncher.Launch(uri.Port);
+                    if (streamUri == null)
+                    {
+                        var su = new UriBuilder(uri) { Port = uri.Port + 1 }.Uri;
+                        RosBridgeLauncher.Launch(su.Port, "rosbridge_streams");
+                        SetStreamUri(su);
+                    }
+                }
+                if (streamUri == null) SetStreamUri(uri);
             }
         }
 
@@ -371,6 +406,7 @@ namespace SimFlake.Ros
                 }
             foreach (var s in c.sockets) if (s != c.main) s.Dispose();
             c.sockets.RemoveAll(s => s != c.main);
+            c.pendingStreams.Clear();
             while (c.mainThread.TryDequeue(out _)) { }
         }
 

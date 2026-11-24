@@ -57,12 +57,16 @@ class Checker(Node):
             self.last[topic] = msg
         return cb
 
-    def spin_for(self, seconds, every=None):
+    def spin_for(self, seconds, every=None, every_hz=20.0):
+        # `every` (e.g. publishing /cmd_vel) runs at a fixed rate like a real teleop/nav node, not once per callback:
+        # that was ~230 Hz, which backed rosbridge up by seconds while it also carried camera frames.
         end = time.monotonic() + seconds
+        next_every = time.monotonic()
         while time.monotonic() < end:
-            rclpy.spin_once(self, timeout_sec=0.02)
-            if every:
+            rclpy.spin_once(self, timeout_sec=0.01)
+            if every and time.monotonic() >= next_every:
                 every()
+                next_every += 1.0 / every_hz
 
 
 def rate(stamps, window):
