@@ -17,3 +17,5 @@ MonoBehaviour:
     prefab: {fileID: 4718049914147549901, guid: 628471afc5c9914faa93ae8ae88a591f, type: 3}
   - label: MINI ROVER
     prefab: {fileID: 7320570949144584995, guid: 9104d7d313b46187984663d912638d53, type: 3}
+  - label: CHASSIS 2026
+    prefab: {fileID: 8083376134994126531, guid: f0a341847c428baed9d951014ecaaeff, type: 3}

@@ -88,7 +88,7 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 ## Folder layout (`rover_sim/Assets`)
 ```
-Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab), Arm/ (Arm.prefab, Motors/ stepper specs,
+Robots/        Chassis/ (one prefab per chassis: chassis_2024.prefab, mini_rover.prefab, chassis_2026.prefab), Arm/ (Arm.prefab, Motors/ stepper specs,
                GripperPad material), Descriptions/ (URDF packages),
                Drivetrain/ (Motors/, Wheels/, Grounds/ spec assets, see Drive physics)
 Prefabs/Props/ props we place in worlds (ArucoMarker_75cm)
@@ -137,6 +137,29 @@ It uses chassis_2024's topics and frame ids, so don't put both rovers in one sce
   (0.35, Minimum combine) caps grip: the bogie pivot is higher (14 cm) than half the bogie wheel spacing (12.7 cm), so at
   friction ~0.5 skid turns flip the bogies onto their limits and roll the rover. `turnSlipFactor` 2.2 matches IMU yaw on CustomDirt.
   (That cap was found before improved patch friction was on; with it on, higher grip may now be fine. Untested.)
+
+`Assets/Robots/Chassis/chassis_2026.prefab` is the 2026 big rover, built the same way from RoverFlake2's `rover_description/urdf/chassis.urdf`
+(copy: `Robots/Descriptions/chassis_2026/chassis_2026.urdf` + only the meshes it uses) by the same builder: each rover is a
+`MiniRoverBuilder.Def` (`MiniRover`, `Chassis2026`), menu `SimFlake > Build Chassis 2026 Prefab`, or `-executeMethod
+SimFlake.EditorTools.MiniRoverBuilder.BuildChassis2026FromCommandLine` (~2 min). In the Esc menu's rover list as CHASSIS 2026 (the builder adds it to
+`Resources/RoverCatalog.asset`). Same topics and frame ids as the other two: one of them per scene. Its URDF is hand-built and partly placeholder
+(see RoverFlake2 `rover_description/CLAUDE.md`, "Big rover"); differences from the mini rover:
+- base_link's origin is the front-bottom corner of the frame (not mid-body), so wheels are sorted front/mid/back per side by position.
+  The zero pose already stands level (no rocker/bogie correction). `RockerDifferential` multiplier -0.3 (the URDF mimic).
+- Sensors: LiDAR = the same Scanse Sweep (scan plane 41.5 mm above `LiDAR_Link`), IMU and GPS on their 19 x 25 x 19 mm boxes (`/gps/fix`
+  from the left antenna; the right one is not simulated). Camera on the front of the PTZ head at the top of the 1 m mast (`PTZ_Link` is kept
+  as the mast's visual + collider), fixed forward: pan/tilt is not simulated. The LiDAR sees the mast behind it (nearest return ~0.67 m).
+- Collision: the importer's VHACD made 527 hulls (PhysX at half chassis_2024's speed; `RobotPhysicsSetup`'s self-collision pairs grow with the
+  square). The builder re-decomposes every link above `maxHullsPerLink` (16) from its visual mesh (`Descriptions/chassis_2026/Hulls/`, 101
+  hulls) and deletes the importer's hull assets. It keeps the STL prefabs and `<stl>_0.asset` meshes: the next import needs them (deleting them
+  made the importer crash with a NullReference in `VHACD.GenerateConvexMeshes`; the fix is to delete the STL prefabs so they are regenerated).
+- **Estimates (no team numbers yet):** total 35 kg (like chassis_2024; the URDF masses add up to ~11 kg and are placeholders, scaled up
+  keeping their proportions), the drive motors are chassis_2024's maxon (`Maxon_ECXFL42M_GPX42_26`), wheel = `Chassis2026Wheel` (the URDF's
+  placeholder: mini rover tread scaled to r = 0.1 m, 69 mm wide, 0.9 kg). Constants in `DrivetrainSetup` (`Chassis2026MassKg`, `ApplyToChassis2026`).
+- Bench (firm ground, 35 kg): top 3.13 m/s, odom < 1.2 %, `turnSlipFactor` 2.0 (point turn matches), climbs 20 deg everywhere and 30 deg on
+  asphalt but not on CustomDirt (slides back at 73 % slip; chassis_2024 climbs it). On soil it climbs 20 deg on sand, hardpack and gravel, 10 on
+  bentonite, 30 on slickrock. Soil costs ~1 ms per step (its baked tread has lugs; chassis_2024's tyre is smooth: 0.4).
+- Size: the visual meshes are ~80 MB of text mesh assets (CAD detail: base_link alone is 212k triangles; vertex welding would save only 37 %).
 
 Adding a robot (new chassis, arm revision...): import the URDF (see Importing URDFs), add the controller and sensors,
 and save it as a new prefab next to the others (`Robots/Chassis/chassis_<year>.prefab`, `Robots/Arm/...`). Copy sensor
@@ -599,6 +622,10 @@ For automated tests, use an isolated ROS graph so you don't publish onto the tea
   `ImageConversion.EncodeArrayToJPG` wants bottom-row-first. See `SensorCamera.ReadbackIsTopDown`. Verified with real
   frames on OpenGL only. If someone forces Vulkan and images are upside down, that's the place to fix.
 - `Shader.Find` returns null in player builds for shaders nothing references. ArUco uses `Resources/ArucoUnlit.mat`.
+- The URDF importer's `UrdfAssetPathHandler.GetRelativeAssetPath` cuts `len(Application.dataPath)` characters off any path longer than
+  that, even a relative `Assets/...` one, so a relative URDF path only works when it happens to be short enough (the mini rover's was
+  exactly 37 characters). Pass an absolute path to `UrdfRobotExtensions.Create` (the builder does); the symptom is "Creating asset at path
+  sis_2026/Materials/Default.mat failed".
 - Ubuntu 24.04 has no `libdl.so` symlink; the URDF importer's Assimp (COLLADA `.dae` only) needs it. `setup.sh` offers
   to create it. STL meshes and VHACD colliders work without it (tested: dev_arm imports to a prefab headless).
 - Don't `pkill -f <pattern>` from a shell whose own command line contains the pattern. It kills itself.

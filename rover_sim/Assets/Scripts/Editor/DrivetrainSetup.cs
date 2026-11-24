@@ -23,6 +23,7 @@ namespace SimFlake.EditorTools
         public const string CylinderMeshPath = Root + "/Wheels/unit_cylinder_collider.asset";
         public const string Chassis2024 = "Assets/Robots/Chassis/chassis_2024.prefab";
         public const string MiniRover = "Assets/Robots/Chassis/mini_rover.prefab";
+        public const string Chassis2026 = "Assets/Robots/Chassis/chassis_2026.prefab";
         public const string TestScene = "Assets/Scenes/Tests/DriveTest.unity";
         public const float FixedTimestep = 0.005f;
 
@@ -40,6 +41,9 @@ namespace SimFlake.EditorTools
 
         [MenuItem("SimFlake/Drivetrain/Apply To mini_rover (keeps sensor moves)", priority = 252)]
         public static void ApplyMiniMenu() => ApplyToMiniRover();
+
+        [MenuItem("SimFlake/Drivetrain/Apply To chassis_2026 (keeps sensor moves)", priority = 252)]
+        public static void ApplyChassis2026Menu() => ApplyToChassis2026();
 
         [MenuItem("SimFlake/Drivetrain/Build Drive Test Scene", priority = 252)]
         public static void BuildTestSceneMenu() => BuildTestScene();
@@ -60,6 +64,7 @@ namespace SimFlake.EditorTools
             SetPhysicsSettings();
             bool ok = ApplyToChassis2024();
             ok &= ApplyToMiniRover();
+            if (Load<GameObject>(Chassis2026) != null) ok &= ApplyToChassis2026();
             ok &= BuildTestScene();
             AssetDatabase.SaveAssets();
             return ok;
@@ -71,6 +76,7 @@ namespace SimFlake.EditorTools
         public static DriveMotorSpec MiniMotor => Load<DriveMotorSpec>(Root + "/Motors/ES_36PG_3429_100.asset");
         public static WheelSpec Chassis2024Wheel => Load<WheelSpec>(Root + "/Wheels/Chassis2024Wheel.asset");
         public static WheelSpec MiniRoverWheel => Load<WheelSpec>(Root + "/Wheels/MiniRoverWheel.asset");
+        public static WheelSpec Chassis2026Wheel => Load<WheelSpec>(Root + "/Wheels/Chassis2026Wheel.asset");
 
         static T Load<T>(string path) where T : UnityEngine.Object => AssetDatabase.LoadAssetAtPath<T>(path);
 
@@ -122,6 +128,13 @@ namespace SimFlake.EditorTools
                 w.notes = "chassis_2024 wheel. Size measured from the imported mesh (radius/width 0). Tread friction 1.0 with Multiply, " +
                           "so the ground material's friction applies as-is. Sphere collider: the mesh cylinder jittered on the ground " +
                           "(25 % contact loss, 0.5 g vibration at 5 ms steps).";
+                w.shape = WheelColliderShape.Sphere; w.material = rubber; w.mass = 0.9f; w.rollingResistanceScale = 1f;
+            });
+            Ensure<WheelSpec>(Root + "/Wheels/Chassis2026Wheel.asset", w =>
+            {
+                w.notes = "chassis_2026 wheel. PLACEHOLDER from its URDF: the mini rover's lugged wheel scaled to r = 0.1 m (drive_control " +
+                          "WHEEL_RADIUS_METERS), 69 mm wide; size measured from that mesh, tread baked from it. Mass 0.9 kg like chassis_2024's " +
+                          "(team number), not measured. Same tread rubber and sphere collider as chassis_2024. Replace when the 26-27 wheel CAD exists.";
                 w.shape = WheelColliderShape.Sphere; w.material = rubber; w.mass = 0.9f; w.rollingResistanceScale = 1f;
             });
             var miniMat = Load<PhysicMaterial>("Assets/Materials/MiniRoverWheel.physicMaterial");
@@ -229,6 +242,12 @@ namespace SimFlake.EditorTools
 
         /// <summary>Same as MiniRoverBuilder does on a rebuild, but on the existing prefab (sensor moves stay).</summary>
         public static bool ApplyToMiniRover() => ApplyToPrefab(MiniRover, MiniMotor, MiniRoverWheel, 2.2);
+
+        // chassis_2026 (MiniRoverBuilder.Chassis2026). ESTIMATES until the team has numbers: same drive motors as chassis_2024
+        // (maxon ECX + GPX42 26:1), same 35 kg without the arm. Its URDF masses add up to ~11 kg and are placeholders.
+        public const float Chassis2026MassKg = 35f;
+        public const double Chassis2026TurnSlip = 2.0;   // point turn at 0.5 rad/s matches (bench: 2.02 dirt, 2.04 asphalt)
+        public static bool ApplyToChassis2026() => ApplyToPrefab(Chassis2026, MaxonMotor, Chassis2026Wheel, Chassis2026TurnSlip, Chassis2026MassKg);
 
         /// <summary>Puts the drivetrain model on a robot prefab whose MotorController lists its six wheels.</summary>
         public static bool ApplyToPrefab(string prefabPath, DriveMotorSpec motor, WheelSpec wheel, double turnSlipFactor = 0, float totalMassKg = 0)
@@ -467,7 +486,8 @@ namespace SimFlake.EditorTools
                 new DriveTestRunner.RoverCase { label = "chassis_2024", prefab = Load<GameObject>(Chassis2024), testSpeed = 1.0f, climbDistance = 5f },
                 new DriveTestRunner.RoverCase { label = "chassis_2024_arm", prefab = Load<GameObject>(Chassis2024), testSpeed = 1.0f, climbDistance = 5f, payloadKg = 15f },
                 new DriveTestRunner.RoverCase { label = "mini_rover", prefab = Load<GameObject>(MiniRover), testSpeed = 0.3f, climbDistance = 2f },
-            };
+                new DriveTestRunner.RoverCase { label = "chassis_2026", prefab = Load<GameObject>(Chassis2026), testSpeed = 1.0f, climbDistance = 5f },
+            }.Where(r => r.prefab != null).ToArray();
             runner.grounds = new[]
             {
                 Load<PhysicMaterial>("Assets/Materials/CustomDirt.physicMaterial"),
