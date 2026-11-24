@@ -187,13 +187,31 @@ public class MotorController : MonoBehaviour
         double w = msg.angular.z;  // rad/s, positive = turn left (counter-clockwise from above)
         lastCommandTime = Time.time; stoppedByTimeout = false;
         double half = track_width_meters * turnSlipFactor / 2.0;
-        double left = (v - w * half) / wheel_radius_meters;   // wheel rad/s
-        double right = (v + w * half) / wheel_radius_meters;
+        double fwd = v / wheel_radius_meters, diff = w * half / wheel_radius_meters;   // wheel rad/s
+        // Above the motors' top speed both sides would clip to the same speed and the turn would vanish. Keep the
+        // turn and give up forward speed instead (like a differential-drive mixer that prioritises steering).
+        double lim = MaxWheelSpeed();
+        if (lim > 0 && Math.Abs(fwd) + Math.Abs(diff) > lim)
+        {
+            if (Math.Abs(diff) > lim) diff = Math.Sign(diff) * lim;
+            fwd = Math.Sign(fwd) * Math.Max(0, lim - Math.Abs(diff));
+        }
+        double left = fwd - diff;
+        double right = fwd + diff;
         for (int i = 0; i < motorCount; i++)
         {
             double ws = isLeftWheel[i] ? left : right;
             SetJointTarget(i, (float)(ws * Mathf.Rad2Deg * SideSign(i)));
         }
+    }
+
+    // rad/s the weakest drive-model wheel can reach (0 = unknown / legacy drive: no limit).
+    double MaxWheelSpeed()
+    {
+        double lim = double.MaxValue;
+        foreach (var dw in driveWheels)
+            if (dw != null && dw.motor != null) lim = Math.Min(lim, dw.motor.NoLoadWheelSpeed * 0.95);
+        return lim == double.MaxValue ? 0 : lim;
     }
 
     void SetJointTarget(int i, float degPerSec)

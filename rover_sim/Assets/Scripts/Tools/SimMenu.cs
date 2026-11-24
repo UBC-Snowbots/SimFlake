@@ -31,6 +31,7 @@ public partial class SimMenu : MonoBehaviour
     public bool keyboardDrive = true;
     public float keyboardSpeed = 0.5f;     // m/s
     public float keyboardTurnRate = 0.8f;  // rad/s
+    float keyboardSpeedMax = 10f, keyboardTurnRateMax = 2f;   // slider ends, typed in the menu
     public static bool KeyboardDriveOn => Instance != null && Instance.keyboardDrive;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -883,10 +884,12 @@ public partial class SimMenu : MonoBehaviour
                 if (keyboardDrive)
                 {
                     Row("SPEED", 120);
-                    keyboardSpeed = Slider(keyboardSpeed, 0.1f, 10f, "{0:0.0} m/s", colW - 240);
+                    keyboardSpeedMax = MaxField("kbSpeedMax", keyboardSpeedMax, 0.2f);
+                    keyboardSpeed = Slider(Mathf.Min(keyboardSpeed, keyboardSpeedMax), 0.1f, keyboardSpeedMax, "{0:0.0} m/s", colW - 360);
                     EndRow();
                     Row("TURN RATE", 120);
-                    keyboardTurnRate = Slider(keyboardTurnRate, 0.2f, 2f, "{0:0.0} rad/s", colW - 240);
+                    keyboardTurnRateMax = MaxField("kbTurnMax", keyboardTurnRateMax, 0.3f);
+                    keyboardTurnRate = Slider(Mathf.Min(keyboardTurnRate, keyboardTurnRateMax), 0.2f, keyboardTurnRateMax, "{0:0.0} rad/s", colW - 360);
                     EndRow();
                 }
                 GUILayout.Label("For quick tests. Arrow keys send the same command as /cmd_vel, only while a key is held, so ROS " +
@@ -1130,6 +1133,27 @@ public partial class SimMenu : MonoBehaviour
         for (int i = 0; i < options.Length; i++)
             if (GUILayout.Button(options[i], i == selected ? sSegOn : sSegOff, GUILayout.Height(28), GUILayout.MinWidth(56))) result = i;
         return result;
+    }
+
+    // Small typed "MAX" box in front of a slider: returns the new maximum once the text parses to more than min.
+    readonly Dictionary<string, string> maxEdits = new Dictionary<string, string>();
+    GUIStyle sMaxField;
+    float MaxField(string id, float max, float min)
+    {
+        if (sMaxField == null)
+        {
+            sMaxField = new GUIStyle(sSegOff) { alignment = TextAnchor.MiddleRight, clipping = TextClipping.Clip };
+            sMaxField.normal.textColor = sMaxField.hover.textColor = sMaxField.focused.textColor = Color.white;
+            sMaxField.focused.background = sSegOff.hover.background;
+        }
+        GUILayout.Label("MAX", sDim, GUILayout.Width(36), GUILayout.Height(28));
+        if (!maxEdits.TryGetValue(id, out var text)) text = max.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        text = GUILayout.TextField(text, 8, sMaxField, GUILayout.Width(60), GUILayout.Height(28));
+        maxEdits[id] = text;
+        GUILayout.Space(12);
+        if (float.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v)
+            && v > min && !float.IsInfinity(v)) return v;
+        return max;
     }
 
     float Slider(float value, float min, float max, string format, float width = 320)
