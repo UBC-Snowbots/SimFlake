@@ -146,12 +146,25 @@ SimFlake.EditorTools.MiniRoverBuilder.BuildChassis2026FromCommandLine` (~2 min).
 (see RoverFlake2 `rover_description/CLAUDE.md`, "Big rover"); differences from the mini rover:
 - base_link's origin is the front-bottom corner of the frame (not mid-body), so wheels are sorted front/mid/back per side by position.
   The zero pose already stands level (no rocker/bogie correction). `RockerDifferential` multiplier -0.3 (the URDF mimic).
+- **Body pitch = `RockerDifferential.stiffness`** (N·m per *radian*, per rocker; sag = m g d / (2 k) for a centre of mass d behind the
+  rocker pivot). At the default 50 chassis_2026 sagged 11.6 deg nose-up (centre of mass ~12 cm behind the pivot); the real differential
+  is a rigid linkage, so it has 20000 (0.03 deg). The drive targets are predicted one step ahead so a stiff drive doesn't drag on the
+  terrain-following motion. The mini rover keeps 50 (sags 1.6 deg). The bench logs `settled, body pitch` and `rest_pitch_deg`.
+- **Looks (`Editor/Chassis2026Body.cs`, from photos of the real rover):** blue powder-coated frame, white panels on all six faces of
+  the frame box (x -0.6..0, y +-0.305, z 0..0.21, 25.4 mm tube; panels 3 mm inside the tubes' outer faces so the blue frame shows around
+  each), three 120 mm fans per side (procedural meshes in `Robots/Chassis/Parts`, 7 mm deep: the rockers run ~2 cm outside the panels;
+  placed clear of the rocker pivot boss), e-stop at the back-left of the top, silver rockers/bogies/differential, carbon mast. Materials in
+  `Robots/Chassis/Materials`, updated in place on a rebuild (edit the code, not the .mat). No internals: the shell is closed.
+- **Arm:** `RoverPayload` + `ArmMount` like chassis_2024 (WORLD menu CONFIGURATION, `--rover-config arm`), on the front-right corner of
+  the top panel as on the real rover: motor hole 10 cm behind the front, 19 cm right of centre, base plate on the panel (link_0 10 cm
+  below it), motor down into the box (overlaps the shell collider: excluded by `IgnoreOverlaps`). Tested: attaches quietly, FIX ARM,
+  drives with it. The position is from a photo, not measured: `MiniRoverBuilder.Chassis2026.armMount`.
 - Sensors: LiDAR = the same Scanse Sweep (scan plane 41.5 mm above `LiDAR_Link`), IMU and GPS on their 19 x 25 x 19 mm boxes (`/gps/fix`
   from the left antenna; the right one is not simulated). Camera on the front of the PTZ head at the top of the 1 m mast (`PTZ_Link` is kept
   as the mast's visual + collider), fixed forward: pan/tilt is not simulated. The LiDAR sees the mast behind it (nearest return ~0.67 m).
 - Collision: the importer's VHACD made 527 hulls (PhysX at half chassis_2024's speed; `RobotPhysicsSetup`'s self-collision pairs grow with the
-  square). The builder re-decomposes every link above `maxHullsPerLink` (16) from its visual mesh (`Descriptions/chassis_2026/Hulls/`, 101
-  hulls) and deletes the importer's hull assets. It keeps the STL prefabs and `<stl>_0.asset` meshes: the next import needs them (deleting them
+  square). base_link is one box over the closed shell; the builder re-decomposes every other link above `maxHullsPerLink` (16) from its
+  visual mesh (`Descriptions/chassis_2026/Hulls/`, 85 hulls in all, PhysX ~15x real time like the mini) and deletes the importer's hull assets. It keeps the STL prefabs and `<stl>_0.asset` meshes: the next import needs them (deleting them
   made the importer crash with a NullReference in `VHACD.GenerateConvexMeshes`; the fix is to delete the STL prefabs so they are regenerated).
 - **Estimates (no team numbers yet):** total 35 kg (like chassis_2024; the URDF masses add up to ~11 kg and are placeholders, scaled up
   keeping their proportions), the drive motors are chassis_2024's maxon (`Maxon_ECXFL42M_GPX42_26`), wheel = `Chassis2026Wheel` (the URDF's
@@ -599,7 +612,8 @@ python3 tools/sim_check.py --drive          # topic rates + drives the rover and
 tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics and Soil model
 /tmp/simbuild/rover_sim.x86_64 -batchmode --play-shots <dir> [--play-shots-drive 1.0] [--play-shots-seconds 12] \
    [--play-shots-at x,z] [--play-shots-heading 135]   # any scene in Play (needs graphics): the rover drives straight, the log
-                                             # gets speed made good + ride roughness, <dir> gets pictures (Tools/PlayShots.cs)
+                                             # gets speed made good + ride roughness, <dir> gets pictures (Tools/PlayShots.cs):
+                                             # 0a-0c = close-ups of the rover before it drives, then the drive and terrain views
 ```
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.

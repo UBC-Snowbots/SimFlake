@@ -54,6 +54,7 @@ public class PlayShots : MonoBehaviour
             rootBody.velocity = Vector3.zero; rootBody.angularVelocity = Vector3.zero;
         }
         yield return new WaitForSeconds(3f);
+        yield return CloseUps(mc.transform.root, body);
         yield return Shot("1_start", body, new Vector3(-2.2f, 1.2f, -3.2f), new Vector3(0, 0.3f, 1f));
         float speed = F("--play-shots-drive", 0.8f), seconds = F("--play-shots-seconds", 12f);
         var cmd = new geometry_msgs.msg.Twist();
@@ -114,6 +115,21 @@ public class PlayShots : MonoBehaviour
         yield return Shot("5_above", body, new Vector3(-6f, 9f, -9f), new Vector3(0, 0, 2f));
         Debug.Log("[PlayShots] done: " + dir);
         Application.Quit(0);
+    }
+
+    /// <summary>Close-ups of the rover itself (front-left, right side, above the back), framed on its renderers' bounds, so they
+    /// work for any rover size and wherever its body's origin is.</summary>
+    IEnumerator CloseUps(Transform rover, Transform body)
+    {
+        var rs = rover.GetComponentsInChildren<Renderer>().Where(r => r.enabled && r.GetComponent<TMPro.TextMeshPro>() == null).ToArray();
+        if (rs.Length == 0) yield break;
+        var b = rs[0].bounds; foreach (var r in rs) b.Encapsulate(r.bounds);
+        var yaw = Quaternion.Euler(0, body.eulerAngles.y, 0);
+        Vector3 c = Quaternion.Inverse(yaw) * (b.center - body.position);   // centre in the heading frame
+        float k = Mathf.Max(b.extents.x, b.extents.z) * 2.2f;
+        yield return Shot("0a_front_left", body, c + new Vector3(-0.8f, 0.55f, 0.9f) * k, c);
+        yield return Shot("0b_right", body, c + new Vector3(1.25f, 0.2f, -0.1f) * k, c);
+        yield return Shot("0c_above_back", body, c + new Vector3(-0.35f, 1.0f, -0.8f) * k, c);
     }
 
     /// <summary>View from a point given in the rover's heading frame (x right, y up, z forward), looking at another.</summary>

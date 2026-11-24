@@ -219,6 +219,7 @@ public class DriveTestRunner : MonoBehaviour
         public ArticulationBody root;
         public MotorController mc;
         public DriveWheel[] wheels;
+        public float restPitch;
         public Vector3 Pos => root.transform.position;
         public Vector3 Fwd => root.transform.forward;
         // From positions: ArticulationBody.velocity reads several % high with the TGS solver.
@@ -306,11 +307,26 @@ public class DriveTestRunner : MonoBehaviour
         currentRover = r;
         // settle
         yield return Drive(r, 0, 0, 1.5f, null);
+        r.restPitch = RestPitch(r);
         if (trace)
             foreach (var c in go.GetComponentsInChildren<Collider>().Where(c => c.enabled && !c.isTrigger && c.GetComponentInParent<DriveWheel>() == null)
                                  .OrderBy(c => c.bounds.min.y).Take(4))
                 Debug.Log($"[Trace] {go.name}: lowest non-wheel collider {c.name} on {c.attachedArticulationBody?.name}: {c.bounds.min.y * 1000:F0} mm above ground");
         done(r);
+    }
+
+    /// <summary>Body pitch on flat ground after settling (deg, + = nose up), logged with the rocker angles: how far the
+    /// body sags on its rocker-bogie (the differential's stiffness is all that holds it).</summary>
+    static float RestPitch(Rover r)
+    {
+        var fwd = r.root.transform.forward;
+        float pitch = Mathf.Atan2(fwd.y, new Vector2(fwd.x, fwd.z).magnitude) * Mathf.Rad2Deg;
+        var diff = r.go.GetComponentInChildren<RockerDifferential>();
+        string rockers = diff != null && diff.leftRocker != null && diff.rightRocker != null
+            ? $", rockers L {diff.leftRocker.jointPosition[0] * Mathf.Rad2Deg:F2} R {diff.rightRocker.jointPosition[0] * Mathf.Rad2Deg:F2} deg"
+            : "";
+        Debug.Log($"[DriveTest] {r.go.name}: settled, body pitch {pitch:F2} deg{rockers}");
+        return pitch;
     }
 
     // Per-wheel state, 4 times per simulated second (--drive-test-trace).
@@ -413,6 +429,7 @@ public class DriveTestRunner : MonoBehaviour
             float trueDist = Vector3.Distance(p0, r.Pos);
             float odomDist = (float)Math.Sqrt((r.mc.OdomX - ox) * (r.mc.OdomX - ox) + (r.mc.OdomY - oy) * (r.mc.OdomY - oy));
             d["cmd_speed"] = rc.testSpeed;
+            d["rest_pitch_deg"] = r.restPitch;
             d["t63_s"] = t63;
             d["cruise_speed"] = Vector3.Distance(p5, r.Pos) / Mathf.Max(tLast - t5, 1e-3f);   // from positions, last 3 s
             d["cruise_speed_physx"] = speeds.Skip(speeds.Count * 5 / 8).Average();             // ArticulationBody.velocity

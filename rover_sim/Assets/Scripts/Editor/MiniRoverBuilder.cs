@@ -26,6 +26,7 @@ namespace SimFlake.EditorTools
         const string LabelMatPath = "Assets/Materials/SensorLabelOverlay.mat";
         const string ReferenceChassis = "Assets/Robots/Chassis/chassis_2024.prefab";
         const string CatalogPath = "Assets/Resources/RoverCatalog.asset";
+        const string ArmPrefab = "Assets/Robots/Arm/Arm.prefab";
 
         // Same order/names as chassis_2024's MotorController (= /motor_commands order).
         static readonly string[] SlotNames = {
@@ -52,6 +53,9 @@ namespace SimFlake.EditorTools
             public float differentialMultiplier;                         // URDF <mimic> multiplier of Differential_joint
             public float totalMassKg;                                    // 0 = keep the URDF masses
             public int maxHullsPerLink;                                  // 0 = keep the importer's VHACD (up to 1024 hulls per mesh)
+            public float diffStiffness = 50f, diffDamping = 2f;          // RockerDifferential per rocker (N·m/rad, N·m·s/rad)
+            public Action<string, GameObject, Transform> decorate;      // (tag, robot, base_link): looks, extra colliders
+            public Vector3? armMount;                                    // link_0 of the stepper arm, base_link-local (Unity); null = no arm
         }
 
         public static readonly Def MiniRover = new Def
@@ -95,6 +99,14 @@ namespace SimFlake.EditorTools
             // The importer gave 527 hulls (base_link 160, rockers 69-93): PhysX ran at half chassis_2024's speed and
             // RobotPhysicsSetup's self-collision pairs grow with the square of that.
             maxHullsPerLink = 16,
+            // The real differential is a rigid linkage. At the default 50 N·m/rad the body (centre of mass ~12 cm behind the
+            // rocker pivot) sagged 11.6 deg nose-up; 20000 leaves ~0.1 deg.
+            diffStiffness = 20000f, diffDamping = 200f,
+            decorate = Chassis2026Body.Apply,
+            // Arm on the top panel's front-right corner (photo): motor hole 10 cm behind the front, 19 cm right of centre. The base
+            // plate (x +7.5 / -19.5 cm, y +-7.5 cm around the motor hole) then clears the LiDAR, IMU and right GPS antenna; its
+            // underside (link_0 + 10 cm) stands on the panel; the motor goes down into the box.
+            armMount = Flu(-0.10f, -0.19f, Chassis2026Body.TopSurface - 0.10f),
         };
 
         [MenuItem("SimFlake/Build Mini Rover Prefab (from URDF)", priority = 310)]
@@ -199,6 +211,7 @@ namespace SimFlake.EditorTools
             jpg.rgbCamera = camera; jpg.frameid = "camera_link"; jpg.topic = "/camera/image/compressed";
             jpg.enabled = false; // same as the scenes (team choice); enable for a JPEG feed
 
+            def.decorate?.Invoke(tag, robot, baseLink);
             if (def.maxHullsPerLink > 0) CapHulls(tag, robot, def);
 
             // ---------- drive ----------
@@ -255,6 +268,19 @@ namespace SimFlake.EditorTools
             diff.rightRocker = Find("RockerR_Link").GetComponent<ArticulationBody>();
             diff.differential = Find("Differential_Link").GetComponent<ArticulationBody>();
             diff.differentialMultiplier = def.differentialMultiplier;
+            diff.stiffness = def.diffStiffness; diff.damping = def.diffDamping;
+
+            // Stepper arm mount (Esc menu > ROVER AND WORLD > ROVER > CONFIGURATION, --rover-config arm), like chassis_2024's.
+            if (def.armMount.HasValue)
+            {
+                var mount = new GameObject("ArmMount").transform;
+                mount.SetParent(baseLink, false);
+                mount.localPosition = def.armMount.Value;
+                mount.localRotation = Quaternion.identity;   // same axes as chassis_2024's chassis_link: the arm faces forward
+                var payload = robot.AddComponent<RoverPayload>();
+                payload.armMount = mount;
+                payload.armPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ArmPrefab) ?? throw new Exception($"{tag} {ArmPrefab} not found");
+            }
 
             foreach (var b in robot.GetComponentsInChildren<ArticulationBody>())
                 Debug.Log($"{tag} body {b.name}: {b.jointType} mass {b.mass:F3} immovable {b.immovable} drive k{b.xDrive.stiffness} d{b.xDrive.damping} f{b.xDrive.forceLimit}");
