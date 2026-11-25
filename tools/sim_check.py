@@ -4,6 +4,8 @@ SimFlake health check. Run while the sim is playing:
 
     python3 tools/sim_check.py            # which sim topics are alive, and at what rate
     python3 tools/sim_check.py --drive    # also drive forward then turn left, and check odom/GPS/IMU respond
+                                          # (publishes /cmd_vel: needs Esc > ROS > DRIVE INPUT = /CMD_VEL DIRECT, i.e. a player
+                                          # with --drive-input cmdvel, or wheel_speed_node running for the default ROVERFLAKE2)
     python3 tools/sim_check.py --arm      # also wiggle arm joint 1 and check /joint_states responds
 
 Needs only a sourced ROS 2 Jazzy environment (no build).
@@ -173,6 +175,10 @@ def drive_test(n):
     print(f"turn left 0.5 rad/s for 4 s: odom yaw {dyaw:+.0f} deg, IMU yaw {imu_dyaw if imu_dyaw is None else round(imu_dyaw)} deg (both should be positive, ~+115)")
     good = dist > 0.5 and dyaw > 10
     print("drive test", "PASSED" if good else "FAILED")
+    if dist < 0.1:
+        print("  rover didn't move: in the default DRIVE INPUT = ROVERFLAKE2 the sim takes /left_wheel_speeds + /right_wheel_speeds,\n"
+              "  so /cmd_vel needs wheel_speed_node (Esc > ROS > START, or --ros-run 'ros2 run drive_control wheel_speed_node').\n"
+              "  Or bypass it: Esc > ROS > /CMD_VEL DIRECT, or a player with --drive-input cmdvel.")
     return good
 
 

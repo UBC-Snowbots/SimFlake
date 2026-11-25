@@ -420,6 +420,7 @@ namespace SimFlake.Ros
             quitting = true;
             foreach (var s in sockets) s.Dispose();
             sockets.Clear();
+            RosNodeRunner.StopAll();
             RosBridgeLauncher.Stop();
             if (instance == this) instance = null;
         }

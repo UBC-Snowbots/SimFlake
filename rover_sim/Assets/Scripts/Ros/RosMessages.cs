@@ -330,4 +330,15 @@ namespace rover_msgs.msg
         public double end_effector;
         public short cmd_value;
     }
+
+    /// <summary>rover_msgs/DriveFeedback (published by RoverFlake2's motor_control_node on drive/feedback).</summary>
+    [Serializable, RosMsg("rover_msgs/msg/DriveFeedback")]
+    public class DriveFeedback : RosMessage
+    {
+        public bool[] valid_data = new bool[0];
+        public double[] target_velocities = new double[0];
+        public double[] actual_velocities = new double[0];
+        public double[] target_positions = new double[0];
+        public double[] actual_positions = new double[0];
+    }
 }

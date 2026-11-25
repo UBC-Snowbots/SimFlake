@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 /// In-game menu ("field PDA"), Esc in Play mode or a player build. Tabs: CONTROLS (every hotkey, greyed out when the
 /// scene doesn't have that feature), CAMERA (free / follow camera, view graphics quality, rover sensor camera resolution),
 /// SOIL (soil model quality, ruts), ROVER AND WORLD (swap the rover for another kind, arm, environment: time of day and weather,
-/// load another scene of the build). V toggles the follow camera without opening the menu.
+/// load another scene of the build), ROS (drive input, start/stop ROS nodes: SimMenuRos.cs). V toggles the follow camera without opening the menu.
 ///
 /// Nothing to add to scenes: it creates itself after the first scene loads (not in -batchmode, so benches, PlayShots
 /// and the soil demo are unaffected). Settings are runtime only; in the editor, graphics quality settings are put back
@@ -147,7 +147,7 @@ public partial class SimMenu : MonoBehaviour
     // ---------------------------------------------------------------- state
     bool open;
     int tab;
-    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "ROVER AND WORLD" };
+    static readonly string[] Tabs = { "CONTROLS", "CAMERA", "SOIL", "ROVER AND WORLD", "ROS" };
     Vector2 scroll;
     string toast; float toastUntil;
 
@@ -382,6 +382,7 @@ public partial class SimMenu : MonoBehaviour
 
         if (pendingSwap >= 0) { int k = pendingSwap; pendingSwap = -1; SwapRover(k); }
         ApplyPendingConfig();
+        UpdateRos();
         KeyboardDrive();
         if (Input.GetKeyDown(menuKey)) SetOpen(!open);
         if (open && GUIUtility.keyboardControl != 0) { } // typing into a field (advanced menu): no hotkeys
@@ -787,6 +788,7 @@ public partial class SimMenu : MonoBehaviour
             case 1: DrawCamera(); break;
             case 2: DrawSoil(); break;
             case 3: DrawWorld(); break;
+            case 4: DrawRos(); break;
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -892,9 +894,10 @@ public partial class SimMenu : MonoBehaviour
                     keyboardTurnRate = Slider(Mathf.Min(keyboardTurnRate, keyboardTurnRateMax), 0.2f, keyboardTurnRateMax, "{0:0.0} rad/s", colW - 360);
                     EndRow();
                 }
-                GUILayout.Label("For quick tests. Arrow keys send the same command as /cmd_vel, only while a key is held, so ROS " +
-                                "commands still work. Real driving goes over ROS: geometry_msgs/Twist on /cmd_vel " +
-                                "(e.g. <b>ros2 run teleop_twist_keyboard teleop_twist_keyboard</b>). The arm listens on /arm/command.", sDim, GUILayout.Width(colW));
+                GUILayout.Label("For quick tests. Arrow keys drive the wheels directly (skid steer, like /CMD_VEL DIRECT), only while " +
+                                "a key is held, so ROS commands still work. Real driving goes over ROS: the RoverFlake2 drive stack " +
+                                "(start wheel_speed_node in the ROS tab, then /cmd_vel, e.g. <b>ros2 run teleop_twist_keyboard teleop_twist_keyboard</b>). " +
+                                "The arm listens on /arm/command.", sDim, GUILayout.Width(colW));
             }
             GUILayout.EndVertical();
             GUILayout.Space(30);

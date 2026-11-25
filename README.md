@@ -19,8 +19,11 @@ Unity Hub and the exact Unity version the project uses. Then, in Unity Hub: **Pr
    It uses the ROS setup from your `~/.bashrc`, or from the terminal you launched Unity from.
    You don't need to source anything first.
 3. Use it like the real rover:
+   The sim stands in for RoverFlake2's `motor_control_node` (it takes `/left_wheel_speeds` + `/right_wheel_speeds`), so run
+   the drive stack as on the rover: **Esc > ROS** starts `wheel_speed_node` (and joy, RViz, any command) with one click.
+   Same tab, DRIVE INPUT = /CMD_VEL DIRECT skips RoverFlake2's drive control and drives straight from `/cmd_vel`.
    ```bash
-   python3 tools/sim_check.py --drive        # is everything publishing? drives the rover a bit
+   python3 tools/sim_check.py --drive        # is everything publishing? drives the rover a bit (publishes /cmd_vel)
    ros2 run teleop_twist_keyboard teleop_twist_keyboard
    ros2 run rover_hmi main_hmi_node          # cmd_vel + arm panel (the sim arm listens on /arm/command, no sim_helper needed)
    rviz2                                     # /camera/image_raw, /scan, /odom ...

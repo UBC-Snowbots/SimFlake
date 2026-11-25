@@ -3,25 +3,57 @@ using SimFlake.Ros;
 using UnityEngine;
 
 /// <summary>
-/// Drives the 6 rover wheels and publishes wheel odometry.
+/// Drives the 6 rover wheels and publishes wheel odometry. Where the wheel commands come from is <see cref="InputMode"/>
+/// (Esc menu > ROS > DRIVE INPUT, or <c>--drive-input roverflake2|cmdvel</c>; one setting for every rover):
 ///
-/// Subscribes:
-///   /cmd_vel         geometry_msgs/Twist          linear.x [m/s], angular.z [rad/s] (skid-steer)
-///   /motor_commands  std_msgs/Float64MultiArray   6 raw wheel joint targets [deg/s], order = wheelJointNames
-/// Publishes:
+/// ROVERFLAKE2 (default): stands in for RoverFlake2's motor_control_node (drive_control/src/motor_control.cpp), so the rest of
+/// RoverFlake2's drive stack runs unchanged (/cmd_vel -> wheel_speed_node -> wheel speeds -> here):
+///   /left_wheel_speeds, /right_wheel_speeds (sub)  std_msgs/Float64MultiArray, data[0] = that side's speed in m/s at the wheel,
+///                                                  in motor direction (the left motors are mirrored: wheel_speed_node sends
+///                                                  -linear + angular for them). Below 0.05 m/s = stop, clamped to 3.5 m/s,
+///                                                  ramped at 50 rad/s². Like the real node, the last speed is kept until a new
+///                                                  one arrives (its Phidget failsafe is fed by its own 20 Hz loop).
+///   /drive/feedback (pub, 1 Hz)                    rover_msgs/DriveFeedback, motors 0-2 = right, 3-5 = left, motor direction.
+/// CMDVEL (bypass RoverFlake2's drive control): skid-steer straight from
+///   /cmd_vel (sub)  geometry_msgs/Twist  linear.x [m/s], angular.z [rad/s], with <see cref="turnSlipFactor"/>. Wheels stop if no
+///                   command arrives for <see cref="commandTimeout"/> s (publish continuously; teleop and nav2 do).
+/// Always:
 ///   /odom                nav_msgs/Odometry      dead-reckoned from wheel joint speeds (frame odom -> base_link)
 ///   /wheel_joint_states  sensor_msgs/JointState wheel positions [rad], velocities [rad/s], effort = wheel torque [N·m]
 ///
-/// Wheels with a <see cref="DriveWheel"/> get their speed target through it (motor + gearhead + controller model).
-/// Wheels without one fall back to the old ideal velocity drive.
-/// Like the real drivers (Phidget failsafe / mini rover firmware), wheels stop if no command arrives for
-/// <see cref="commandTimeout"/> seconds, so publish cmd_vel continuously (teleop and nav2 do).
+/// The in-sim tools (keyboard drive, benches, PlayShots) call <see cref="CmdVelCallback"/> directly in either mode: the latest
+/// command wins. Wheels with a <see cref="DriveWheel"/> get their speed target through it (motor + gearhead + controller model);
+/// wheels without one fall back to the old ideal velocity drive.
 /// </summary>
 public class MotorController : MonoBehaviour
 {
     const int motorCount = 6;
 
-    [Header("Wheels (order matters: matches /motor_commands)")]
+    public enum DriveInput { RoverFlake2, CmdVel }
+    static DriveInput inputMode = InputFromCommandLine();
+
+    /// <summary>Where every rover's wheel commands come from. Changing it stops the wheels.</summary>
+    public static DriveInput InputMode
+    {
+        get => inputMode;
+        set
+        {
+            if (value == inputMode) return;
+            inputMode = value;
+            foreach (var mc in FindObjectsOfType<MotorController>()) mc.StopWheels();
+            Debug.Log($"[MotorController] drive input: {value}");
+        }
+    }
+
+    static DriveInput InputFromCommandLine()
+    {
+        var a = Environment.GetCommandLineArgs();
+        int i = Array.IndexOf(a, "--drive-input");
+        if (i >= 0 && i + 1 < a.Length && a[i + 1].Replace("_", "").ToLowerInvariant() == "cmdvel") return DriveInput.CmdVel;
+        return DriveInput.RoverFlake2;
+    }
+
+    [Header("Wheels")]
     [Tooltip("Extra per-wheel sign flip, applied on top of the left/right convention. Leave at 1 unless one wheel spins the wrong way.")]
     [SerializeField] private int[] motor_dirs = { 1, 1, 1, 1, 1, 1 };
 
@@ -45,8 +77,13 @@ public class MotorController : MonoBehaviour
     [SerializeField] private float wheelDriveDamping = 1000f;
 
     [Header("Topics")]
-    [SerializeField] private string motorTopicName = "/motor_commands";
     [SerializeField] private string cmdVelTopicName = "/cmd_vel";
+    [SerializeField] private string leftWheelTopic = "/left_wheel_speeds";
+    [SerializeField] private string rightWheelTopic = "/right_wheel_speeds";
+    [SerializeField] private string driveFeedbackTopic = "/drive/feedback";
+
+    // motor_control.h (RoverFlake2)
+    const double MinVelocityMs = 0.05, MaxVelocityMs = 3.5, MaxAccelRads = 50.0, FeedbackPeriod = 1.0;
 
     [Header("Geometry")]
     [Tooltip("Measured from the wheel colliders at start when 'autoMeasureGeometry' is on.")]
@@ -58,7 +95,7 @@ public class MotorController : MonoBehaviour
     [SerializeField] private double turnSlipFactor = 2.3;
 
     [Header("Safety")]
-    [Tooltip("Stop the wheels if no /cmd_vel or /motor_commands arrives for this long (s). The real rovers do this at 0.5 s. 0 = never.")]
+    [Tooltip("DRIVE INPUT = CMDVEL: stop the wheels if no /cmd_vel arrives for this long (s). 0 = never.")]
     [SerializeField] private float commandTimeout = 0.5f;
 
     [Header("Odometry")]
@@ -80,6 +117,14 @@ public class MotorController : MonoBehaviour
     readonly DriveWheel[] driveWheels = new DriveWheel[motorCount];
     float lastCommandTime = float.NegativeInfinity;
     bool stoppedByTimeout = true;
+
+    // RoverFlake2 path: per wheel, forward rad/s.
+    bool rf2Active;                                     // the newest command came from the wheel-speed topics
+    readonly double[] rf2Target = new double[motorCount];
+    readonly double[] wheelCmd = new double[motorCount];   // forward rad/s last sent to each wheel (any path)
+    readonly double[] motorTargetPos = new double[motorCount];
+    RosPublisher<rover_msgs.msg.DriveFeedback> feedbackPub;
+    double feedbackTimer;
 
     /// <summary>Wheel-odometry pose in the odom frame (x forward at start, y left, yaw CCW), m / rad.</summary>
     public double OdomX => odomX;
@@ -128,8 +173,9 @@ public class MotorController : MonoBehaviour
         }
 
         // queue_length 1: only the newest command matters, a backlog in rosbridge would only add lag.
-        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, CmdVelCallback, queueLength: 1));
-        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(motorTopicName, MotorCommandCallback, queueLength: 1));
+        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, OnCmdVelTopic, queueLength: 1));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(leftWheelTopic, m => OnWheelSpeeds(m, true), queueLength: 1));
+        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(rightWheelTopic, m => OnWheelSpeeds(m, false), queueLength: 1));
 
         if (publishOdometry)
         {
@@ -170,23 +216,87 @@ public class MotorController : MonoBehaviour
 
     int SideSign(int i) => (isLeftWheel[i] ? 1 : -1) * (motor_dirs.Length > i && motor_dirs[i] != 0 ? motor_dirs[i] : 1);
 
-    // Raw per-wheel joint targets in deg/s (same behaviour as before the Jazzy migration).
-    public void MotorCommandCallback(std_msgs.msg.Float64MultiArray msg)
+    // ---------------------------------------------------------------- RoverFlake2 motor_control_node
+
+    void OnWheelSpeeds(std_msgs.msg.Float64MultiArray msg, bool left)
     {
-        if (msg.data == null || msg.data.Length != motorCount)
-        {
-            Debug.LogWarning($"[MotorController] Expected {motorCount} motor commands, got {msg.data?.Length ?? 0}.");
-            return;
-        }
-        lastCommandTime = Time.time; stoppedByTimeout = false;
-        for (int i = 0; i < motorCount; i++) SetJointTarget(i, (float)msg.data[i]);
+        if (inputMode != DriveInput.RoverFlake2) return;
+        double v = msg.data == null || msg.data.Length == 0 ? 0 : msg.data[0];   // like the node: only data[0]
+        double rad = Math.Abs(v) < MinVelocityMs ? 0 : Math.Max(-MaxVelocityMs, Math.Min(MaxVelocityMs, v)) / wheel_radius_meters;
+        for (int i = 0; i < motorCount; i++)
+            if (isLeftWheel[i] == left) rf2Target[i] = rad * MotorSign(i);
+        if (!rf2Active) { rf2Active = true; feedbackTimer = 0; }
     }
 
+    // The real rover's left motors are mounted mirrored: positive motor speed = forward on the right, backward on the left.
+    int MotorSign(int i) => isLeftWheel[i] ? -1 : 1;
+
+    // Motor index on the real rover (0-2 right, 3-5 left) -> wheel index here (sides in wheel order).
+    int[] motorToWheel;
+    int[] MotorToWheel()
+    {
+        if (motorToWheel != null) return motorToWheel;
+        var l = new System.Collections.Generic.List<int>();
+        for (int i = 0; i < motorCount; i++) if (!isLeftWheel[i]) l.Add(i);
+        for (int i = 0; i < motorCount; i++) if (isLeftWheel[i]) l.Add(i);
+        return motorToWheel = l.ToArray();
+    }
+
+    void StepRoverFlake2(double dt)
+    {
+        double dv = MaxAccelRads * dt;
+        for (int i = 0; i < motorCount; i++)
+        {
+            double c = wheelCmd[i] + Math.Max(-dv, Math.Min(dv, rf2Target[i] - wheelCmd[i]));
+            SetWheel(i, c);
+            motorTargetPos[i] += c * MotorSign(i) * dt;
+        }
+        feedbackTimer -= dt;
+        if (feedbackTimer > 0) return;
+        feedbackTimer += FeedbackPeriod;
+        if (feedbackPub == null) feedbackPub = Ros.Advertise<rover_msgs.msg.DriveFeedback>(driveFeedbackTopic, 2);
+        var m = new rover_msgs.msg.DriveFeedback
+        {
+            valid_data = new bool[motorCount], target_velocities = new double[motorCount], actual_velocities = new double[motorCount],
+            target_positions = new double[motorCount], actual_positions = new double[motorCount],
+        };
+        var map = MotorToWheel();
+        for (int k = 0; k < map.Length; k++)
+        {
+            int i = map[k];
+            var j = wheelJoints[i];
+            m.target_velocities[k] = rf2Target[i] * MotorSign(i) * wheel_radius_meters;
+            m.target_positions[k] = motorTargetPos[i];
+            if (j == null || j.jointPosition.dofCount == 0) continue;
+            m.valid_data[k] = true;
+            double fwd = j.jointVelocity[0] * SideSign(i);   // rad/s forward
+            m.actual_velocities[k] = fwd * MotorSign(i) * wheel_radius_meters;
+            m.actual_positions[k] = j.jointPosition[0] * SideSign(i) * MotorSign(i);
+        }
+        feedbackPub.Publish(m);
+    }
+
+    // ---------------------------------------------------------------- /cmd_vel (bypass) and in-sim tools
+
+    void OnCmdVelTopic(geometry_msgs.msg.Twist msg)
+    {
+        if (inputMode == DriveInput.CmdVel) CmdVelCallback(msg);
+    }
+
+    void StopWheels()
+    {
+        rf2Active = false;
+        Array.Clear(rf2Target, 0, motorCount);
+        for (int i = 0; i < motorCount; i++) SetWheel(i, 0);
+    }
+
+    /// <summary>Skid-steer straight from a twist (the /cmd_vel bypass; keyboard drive and benches call it in either mode).</summary>
     public void CmdVelCallback(geometry_msgs.msg.Twist msg)
     {
         double v = msg.linear.x;   // m/s forward
         double w = msg.angular.z;  // rad/s, positive = turn left (counter-clockwise from above)
         lastCommandTime = Time.time; stoppedByTimeout = false;
+        rf2Active = false;
         double half = track_width_meters * turnSlipFactor / 2.0;
         double fwd = v / wheel_radius_meters, diff = w * half / wheel_radius_meters;   // wheel rad/s
         // Above the motors' top speed both sides would clip to the same speed and the turn would vanish. Keep the
@@ -199,11 +309,7 @@ public class MotorController : MonoBehaviour
         }
         double left = fwd - diff;
         double right = fwd + diff;
-        for (int i = 0; i < motorCount; i++)
-        {
-            double ws = isLeftWheel[i] ? left : right;
-            SetJointTarget(i, (float)(ws * Mathf.Rad2Deg * SideSign(i)));
-        }
+        for (int i = 0; i < motorCount; i++) SetWheel(i, isLeftWheel[i] ? left : right);
     }
 
     // rad/s the weakest drive-model wheel can reach (0 = unknown / legacy drive: no limit).
@@ -213,6 +319,12 @@ public class MotorController : MonoBehaviour
         foreach (var dw in driveWheels)
             if (dw != null && dw.motor != null) lim = Math.Min(lim, dw.motor.NoLoadWheelSpeed * 0.95);
         return lim == double.MaxValue ? 0 : lim;
+    }
+
+    void SetWheel(int i, double forwardRadS)
+    {
+        wheelCmd[i] = forwardRadS;
+        SetJointTarget(i, (float)(forwardRadS * Mathf.Rad2Deg * SideSign(i)));
     }
 
     void SetJointTarget(int i, float degPerSec)
@@ -227,10 +339,11 @@ public class MotorController : MonoBehaviour
 
     void FixedUpdate()
     {
-        if (!stoppedByTimeout && commandTimeout > 0 && Time.time - lastCommandTime > commandTimeout)
+        if (rf2Active) StepRoverFlake2(Time.fixedDeltaTime);
+        else if (!stoppedByTimeout && commandTimeout > 0 && Time.time - lastCommandTime > commandTimeout)
         {
             stoppedByTimeout = true;
-            for (int i = 0; i < motorCount; i++) SetJointTarget(i, 0);
+            for (int i = 0; i < motorCount; i++) SetWheel(i, 0);
         }
         if (!publishOdometry) return;
 

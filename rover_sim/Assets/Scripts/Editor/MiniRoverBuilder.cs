@@ -103,10 +103,11 @@ namespace SimFlake.EditorTools
             // rocker pivot) sagged 11.6 deg nose-up; 20000 leaves ~0.1 deg.
             diffStiffness = 20000f, diffDamping = 200f,
             decorate = Chassis2026Body.Apply,
-            // Arm on the top panel's front-right corner (photo): motor hole 10 cm behind the front, 19 cm right of centre. The base
-            // plate (x +7.5 / -19.5 cm, y +-7.5 cm around the motor hole) then clears the LiDAR, IMU and right GPS antenna; its
-            // underside (link_0 + 10 cm) stands on the panel; the motor goes down into the box.
-            armMount = Flu(-0.10f, -0.19f, Chassis2026Body.TopSurface - 0.10f),
+            // Arm on the top panel's front-left corner, as on the real rover: motor hole 10 cm behind the front, 17 cm left of
+            // centre. The base plate (x +7.5 / -19.5 cm, y +-7.5 cm around the motor hole) stands on the panel (its underside =
+            // link_0 + 10 cm); the motor goes down into the box. 17 cm, not 19: the plate would overlap the left GPS antenna's
+            // block (x -0.26, y 0.25-0.27) by 1.7 cm; at 17 it clears it by 3 mm, and the LiDAR and IMU (centre line).
+            armMount = Flu(-0.10f, 0.17f, Chassis2026Body.TopSurface - 0.10f),
         };
 
         [MenuItem("SimFlake/Build Mini Rover Prefab (from URDF)", priority = 310)]

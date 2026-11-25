@@ -35,8 +35,10 @@ Roadmap (wanted, not started; don't do these unless asked):
   Unity starts rosbridge automatically when you press Play (if nothing is already on port 9090) and stops it afterwards.
   It also starts `rosbridge_streams` on 9091 for the cameras (else fast `/cmd_vel` starves): see `claude/rosbridge-camera-starvation.md`.
   If Unity was started from a terminal with ROS sourced, rosbridge gets that terminal's environment.
-  Otherwise it goes through `bash -i`, i.e. `~/.bashrc`, so `ROS_DOMAIN_ID`, `RMW_IMPLEMENTATION` and the RoverFlake2
-  overlay match your terminals.
+  Otherwise it goes through `bash -i`, i.e. `~/.bashrc`, so `ROS_DOMAIN_ID` and `RMW_IMPLEMENTATION` match your terminals.
+  Either way, if `rover_msgs` isn't on the path yet, the RoverFlake2 workspace's `install/setup.bash` is sourced too (path: Esc >
+  ROS > ROVERFLAKE2 WORKSPACE, default `~/RoverFlake2` or `$ROVERFLAKE2_WS`). All of that is `Ros/RosProcess.cs`, shared by
+  rosbridge and the nodes started from the menu (`Ros/RosNodeRunner.cs`, stopped when Play stops; players: `--ros-run "<cmd>"`).
 - **Why not Ros2ForUnity / ROS-TCP-Connector?** Ros2ForUnity (used before) ships native binaries built per distro.
   It only supports Humble and refuses to run on Jazzy; that was the reason the sim broke. ROS-TCP-Endpoint isn't
   packaged for Jazzy and needs building. rosbridge is maintained, packaged for Jazzy, and doesn't care which RMW or
@@ -73,8 +75,9 @@ Ros.Subscribe<geometry_msgs.msg.Twist>("/cmd_vel", msg => { ... });       // cal
 
 | Topic | Type | Script |
 |---|---|---|
-| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`: skid-steer, real m/s and rad/s (arrow keys in Play do the same, see In-game menu). Wheels stop 0.5 s after the last command (like the real drivers), so publish continuously |
-| `/motor_commands` (sub) | std_msgs/Float64MultiArray | `MotorController`: 6 raw wheel targets, deg/s |
+| `/left_wheel_speeds`, `/right_wheel_speeds` (sub) | std_msgs/Float64MultiArray | `MotorController`, DRIVE INPUT = ROVERFLAKE2 (default): stands in for RoverFlake2's `motor_control_node`. data[0] = m/s at the wheel in motor direction (left motors mirrored: `wheel_speed_node` sends -linear + angular), < 0.05 = stop, clamp 3.5, ramp 50 rad/s². Keeps the last speed like the real node (no timeout). `/cmd_vel` then needs `wheel_speed_node` (Esc > ROS) |
+| `/drive/feedback` | rover_msgs/DriveFeedback | `MotorController` (ROVERFLAKE2 mode), 1 Hz, motors 0-2 right, 3-5 left, motor direction, m/s and rad |
+| `/cmd_vel` (sub) | geometry_msgs/Twist | `MotorController`, DRIVE INPUT = /CMD_VEL DIRECT (bypass, `--drive-input cmdvel`): skid-steer, real m/s and rad/s with `turnSlipFactor`. Wheels stop 0.5 s after the last command, so publish continuously. Arrow keys and benches call this path directly in either mode |
 | `/odom` | nav_msgs/Odometry | `MotorController`: wheel odometry, `odom` -> `base_link` |
 | `/wheel_joint_states` | sensor_msgs/JointState | `MotorController`: position, velocity, effort = wheel torque (N·m) |
 | `/imu/data` | sensor_msgs/Imu | `ImuSensor` (on `chassis_link`) |
@@ -156,8 +159,9 @@ SimFlake.EditorTools.MiniRoverBuilder.BuildChassis2026FromCommandLine` (~2 min).
   each), three 120 mm fans per side (procedural meshes in `Robots/Chassis/Parts`, 7 mm deep: the rockers run ~2 cm outside the panels;
   placed clear of the rocker pivot boss), e-stop at the back-left of the top, silver rockers/bogies/differential, carbon mast. Materials in
   `Robots/Chassis/Materials`, updated in place on a rebuild (edit the code, not the .mat). No internals: the shell is closed.
-- **Arm:** `RoverPayload` + `ArmMount` like chassis_2024 (WORLD menu CONFIGURATION, `--rover-config arm`), on the front-right corner of
-  the top panel as on the real rover: motor hole 10 cm behind the front, 19 cm right of centre, base plate on the panel (link_0 10 cm
+- **Arm:** `RoverPayload` + `ArmMount` like chassis_2024 (WORLD menu CONFIGURATION, `--rover-config arm`), on the front-left corner of
+  the top panel as on the real rover: motor hole 10 cm behind the front, 17 cm left of centre (19 would put the base plate 1.7 cm into the
+  left GPS antenna's block; the prefab was edited in place, a rebuild gives the same), base plate on the panel (link_0 10 cm
   below it), motor down into the box (overlaps the shell collider: excluded by `IgnoreOverlaps`). Tested: attaches quietly, FIX ARM,
   drives with it. The position is from a photo, not measured: `MiniRoverBuilder.Chassis2026.armMount`.
 - Sensors: LiDAR = the same Scanse Sweep (scan plane 41.5 mm above `LiDAR_Link`), IMU and GPS on their 19 x 25 x 19 mm boxes (`/gps/fix`
@@ -324,10 +328,13 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
   North site of the same lidar tile is the obvious place for a delivery course.
 
 ## In-game menu and cameras
-`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with four tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
+`Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with five tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
 (Esc, Q/E) and greys out the ones the scene lacks; add new hotkeys to `SimMenu.Hotkeys()`. CAMERA has free/follow camera, Unity quality level, AA,
 shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ROVER AND WORLD swaps the rover (ROVER > MODEL), shows the arm, has an ENVIRONMENT section
-(the scene's `SkyEnvironment` time of day and weather, no hotkeys on purpose) and loads another scene of the build.
+(the scene's `SkyEnvironment` time of day and weather, no hotkeys on purpose) and loads another scene of the build. ROS (`Tools/SimMenuRos.cs`)
+has DRIVE INPUT (RoverFlake2 wheel speeds vs /cmd_vel direct, see Topics), the RoverFlake2 workspace path, START/STOP for preset nodes
+(`RosNodeRunner.Presets`: wheel_speed_node, joy_node, drive_control_node, joy_arm_control, rviz2), a field to run any command, and each
+node's last output lines. Commands that need a terminal (teleop_twist_keyboard) don't work there.
   Before loading a scene it calls `RosConnection.ResetForSceneChange()`: subscriptions and camera sockets belong to the old scene's
   objects, but the connection is `DontDestroyOnLoad`. rosbridge stays up. Scenes load by build index, so list them in the build.
 - Rover swap (`Scripts/Robot/RoverCatalog.cs`): the list is `Resources/RoverCatalog.asset` (label + prefab; being in Resources puts
@@ -610,6 +617,7 @@ $U -batchmode -nographics -projectPath rover_sim -executeMethod SimFlake.EditorT
    -scenes Assets/Scenes/TaskWorlds/WaypointTask.unity -out /tmp/simbuild/rover_sim.x86_64 -logFile build.log
 /tmp/simbuild/rover_sim.x86_64 -batchmode -nographics --rosbridge-url ws://127.0.0.1:9090 -logFile player.log &   # physics/sensors without a GPU window
 python3 tools/sim_check.py --drive          # topic rates + drives the rover (cmd_vel at 20 Hz) and checks odom/GPS/IMU agree
+                                             # (player needs --drive-input cmdvel, or --ros-run "ros2 run drive_control wheel_speed_node")
 tools/drive_bench.sh                         # drivetrain test bench (no ROS), see Drive physics and Soil model
 /tmp/simbuild/rover_sim.x86_64 -batchmode --play-shots <dir> [--play-shots-drive 1.0] [--play-shots-seconds 12] \
    [--play-shots-at x,z] [--play-shots-heading 135]   # any scene in Play (needs graphics): the rover drives straight, the log
