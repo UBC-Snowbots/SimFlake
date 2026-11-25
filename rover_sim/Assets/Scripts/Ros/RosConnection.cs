@@ -307,15 +307,22 @@ namespace SimFlake.Ros
         internal void Unsubscribe(RosSubscription sub)
         {
             sub.Active = false;
-            lock (registryLock)
+            lock (main.HandshakeLock)
             {
-                if (subsByTopic.TryGetValue(sub.Topic, out var list))
+                bool last = false;
+                lock (registryLock)
                 {
-                    list.Remove(sub);
-                    if (list.Count == 0) subsByTopic.Remove(sub.Topic);
+                    if (subsByTopic.TryGetValue(sub.Topic, out var list))
+                    {
+                        list.Remove(sub);
+                        if (list.Count == 0) { subsByTopic.Remove(sub.Topic); last = true; }
+                    }
                 }
+                // Last local subscriber gone: drop rosbridge's subscription too. rosbridge is one Python process, and a busy
+                // topic nobody reads still costs it (see claude/rosbridge-camera-starvation.md). Our subscribes carry no id,
+                // so this removes this client's subscription to the topic.
+                if (last && main.Connected) main.EnqueueText("{\"op\":\"unsubscribe\",\"topic\":" + RosJson.Quote(sub.Topic) + "}");
             }
-            // Leave the rosbridge-side subscription; it is cleaned up on disconnect and costs nothing.
         }
 
         [Serializable] class Envelope { public string op; public string topic; public string level; public string msg; }

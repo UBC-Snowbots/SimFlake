@@ -22,12 +22,20 @@ namespace SimFlake.Ros
         {
             new Preset("wheel_speed_node", "ros2 run drive_control wheel_speed_node",
                 "RoverFlake2 drive: /cmd_vel -> left/right_wheel_speeds. With DRIVE INPUT = ROVERFLAKE2 the rover only moves on /cmd_vel while this runs, as on the real rover."),
-            new Preset("joy_node", "ros2 run joy joy_node",
-                "Gamepad -> /joy. Plug the controller in before starting it."),
+            // Rate-capped on purpose. joy_linux's defaults (coalesce_interval 1 ms) publish /joy on every stick event, up to
+            // ~1 kHz while a stick moves; drive_control_node and wheel_speed_node pass that on (x3 topics), and rosbridge falls
+            // seconds behind above ~100 Hz: the rover then replays old commands ("phantom" driving). 50 ms coalescing + 20 Hz
+            // autorepeat = at most ~20 Hz, steady while a stick is held. See claude/rosbridge-camera-starvation.md.
+            new Preset("joy_linux_node",
+                "ros2 run joy_linux joy_linux_node --ros-args -p coalesce_interval:=0.05 -p autorepeat_rate:=20.0 -p deadzone:=0.08",
+                "Gamepad -> /joy at <= 20 Hz (RoverFlake2's default joystick driver, rate-capped so rosbridge keeps up). Plug the controller in first."),
+            new Preset("joy_node",
+                "ros2 run joy joy_node --ros-args -p coalesce_interval_ms:=50 -p autorepeat_rate:=20.0 -p deadzone:=0.08",
+                "Gamepad -> /joy via the joy package (Switch controllers need this one), also capped at ~20 Hz. Run one of the two, not both."),
             new Preset("drive_control_node", "ros2 run drive_control drive_control_node",
-                "RoverFlake2 gamepad drive: /joy -> /cmd_vel (left stick forward, right stick turn). Needs joy_node and wheel_speed_node."),
+                "RoverFlake2 gamepad drive: /joy -> /cmd_vel (left stick forward, right stick turn). Needs a joy node and wheel_speed_node."),
             new Preset("joy_arm_control", "ros2 run arm_control joy_arm_control",
-                "RoverFlake2 gamepad arm: /joy -> /arm/command. Needs joy_node and the arm (ROVER AND WORLD > CONFIGURATION)."),
+                "RoverFlake2 gamepad arm: /joy -> /arm/command. Needs a joy node and the arm (ROVER AND WORLD > CONFIGURATION)."),
             new Preset("rviz2", "ros2 run rviz2 rviz2", "RViz."),
         };
 

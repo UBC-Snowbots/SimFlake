@@ -40,7 +40,7 @@ public class MotorController : MonoBehaviour
         {
             if (value == inputMode) return;
             inputMode = value;
-            foreach (var mc in FindObjectsOfType<MotorController>()) mc.StopWheels();
+            foreach (var mc in FindObjectsOfType<MotorController>()) { mc.StopWheels(); mc.SubscribeCommands(); }
             Debug.Log($"[MotorController] drive input: {value}");
         }
     }
@@ -173,9 +173,7 @@ public class MotorController : MonoBehaviour
         }
 
         // queue_length 1: only the newest command matters, a backlog in rosbridge would only add lag.
-        subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, OnCmdVelTopic, queueLength: 1));
-        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(leftWheelTopic, m => OnWheelSpeeds(m, true), queueLength: 1));
-        subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(rightWheelTopic, m => OnWheelSpeeds(m, false), queueLength: 1));
+        SubscribeCommands();
 
         if (publishOdometry)
         {
@@ -215,6 +213,21 @@ public class MotorController : MonoBehaviour
     }
 
     int SideSign(int i) => (isLeftWheel[i] ? 1 : -1) * (motor_dirs.Length > i && motor_dirs[i] != 0 ? motor_dirs[i] : 1);
+
+    // Only the current mode's topics: rosbridge then doesn't carry the other ones at all (a joystick chain publishes
+    // /cmd_vel and both wheel-speed topics; everything rosbridge forwards adds to its backlog).
+    void SubscribeCommands()
+    {
+        foreach (var s in subs) s.Unsubscribe();
+        subs.Clear();
+        if (inputMode == DriveInput.CmdVel)
+            subs.Add(Ros.Subscribe<geometry_msgs.msg.Twist>(cmdVelTopicName, OnCmdVelTopic, queueLength: 1));
+        else
+        {
+            subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(leftWheelTopic, m => OnWheelSpeeds(m, true), queueLength: 1));
+            subs.Add(Ros.Subscribe<std_msgs.msg.Float64MultiArray>(rightWheelTopic, m => OnWheelSpeeds(m, false), queueLength: 1));
+        }
+    }
 
     // ---------------------------------------------------------------- RoverFlake2 motor_control_node
 

@@ -59,3 +59,22 @@ Isolated graph (`ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`), pl
   the log shows `camera streams go through ws://127.0.0.1:9394/`.
 Then flood `/cmd_vel` at 230 Hz from one node and check delivery from another, or run the old `sim_check`
 (`git show 749782b~1:tools/sim_check.py`).
+
+## Joysticks: "phantom" driving (2026-11-25)
+Reported with joy_linux driving through RoverFlake2's chain (joy -> drive_control_node -> /cmd_vel -> wheel_speed_node ->
+/left_wheel_speeds + /right_wheel_speeds -> sim): the rover kept doing things after the stick was let go. joy_linux's defaults
+(`coalesce_interval` 0.001 s, publish on every event) give up to ~1 kHz on /joy while a stick moves; drive_control_node republishes
+each one, wheel_speed_node turns each into two messages. Measured (WaypointTask player with graphics, cameras on their own rosbridge,
+real wheel_speed_node, synthetic /cmd_vel, time from the first stop command until odom < 0.05 m/s; 0.15 s of that is the motor ramp):
+
+| /cmd_vel rate | stopped after |
+|---|---|
+| 1000 Hz | 0.68 s |
+| 20 Hz | 0.15 s |
+
+Worse with a shared rosbridge or a busier machine (table above). Fixes: the Esc > ROS joy presets cap /joy at ~20 Hz
+(`coalesce_interval` 50 ms, `autorepeat_rate` 20 so a held stick still refreshes); `MotorController` subscribes only to the current
+DRIVE INPUT's topics, and `RosConnection.Unsubscribe` now sends rosbridge an `unsubscribe` when a topic's last local subscriber goes
+(before, rosbridge kept forwarding /cmd_vel to the sim in ROVERFLAKE2 mode). Not measured: how much the dropped /cmd_vel subscription
+alone helps. On the real rover the same chain has no rosbridge, but RoverFlake2's game_controller.launch (100 Hz autorepeat) is worth
+a look if its drive lags too.
