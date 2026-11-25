@@ -333,7 +333,7 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
 shadows, terrain detail, frame cap and the rover cameras' ROS resolution/rate/JPEG. SOIL has quality, ruts and soil ms/step. ROVER AND WORLD swaps the rover (ROVER > MODEL), shows the arm, has an ENVIRONMENT section
 (the scene's `SkyEnvironment` time of day and weather, no hotkeys on purpose) and loads another scene of the build. ROS (`Tools/SimMenuRos.cs`)
 has DRIVE INPUT (RoverFlake2 wheel speeds vs /cmd_vel direct, see Topics), the RoverFlake2 workspace path, START/STOP for preset nodes
-(`RosNodeRunner.Presets`: wheel_speed_node, joy_linux_node / joy_node, drive_control_node, joy_arm_control, rviz2), a field to run any command,
+(`RosNodeRunner.Presets`: wheel_speed_node, joy_linux_node / joy_node (exclusive: `Preset.group`; two drivers on /joy double the rate and mix two axis layouts), drive_control_node, joy_arm_control, rviz2), a field to run any command,
 and each node's last output lines. Commands that need a terminal (teleop_twist_keyboard) don't work there. The joy presets are rate-capped
 (~20 Hz: `coalesce_interval` 50 ms + `autorepeat_rate` 20): joy_linux's default publishes on every stick event (~1 kHz), the chain
 triples it, rosbridge falls behind and the rover replays old commands ("phantom" driving; claude/rosbridge-camera-starvation.md, "Joysticks").

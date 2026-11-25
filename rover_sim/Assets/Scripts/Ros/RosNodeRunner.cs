@@ -14,7 +14,9 @@ namespace SimFlake.Ros
         public class Preset
         {
             public string label, command, blurb;
-            public Preset(string label, string command, string blurb) { this.label = label; this.command = command; this.blurb = blurb; }
+            public string group;   // starting a preset stops the running ones of the same group
+            public Preset(string label, string command, string blurb, string group = null)
+            { this.label = label; this.command = command; this.blurb = blurb; this.group = group; }
         }
 
         /// <summary>The menu's list. Commands are bash; add entries here.</summary>
@@ -27,11 +29,14 @@ namespace SimFlake.Ros
             // seconds behind above ~100 Hz: the rover then replays old commands ("phantom" driving). 50 ms coalescing + 20 Hz
             // autorepeat = at most ~20 Hz, steady while a stick is held. See claude/rosbridge-camera-starvation.md.
             new Preset("joy_linux_node",
-                "ros2 run joy_linux joy_linux_node --ros-args -p coalesce_interval:=0.05 -p autorepeat_rate:=20.0 -p deadzone:=0.08",
-                "Gamepad -> /joy at <= 20 Hz (RoverFlake2's default joystick driver, rate-capped so rosbridge keeps up). Plug the controller in first."),
+                "ros2 run joy_linux joy_linux_node --ros-args -r __node:=joy_linux_node -p coalesce_interval:=0.05 -p autorepeat_rate:=20.0 -p deadzone:=0.08",
+                "Gamepad -> /joy at <= 20 Hz (RoverFlake2's default joystick driver, rate-capped so rosbridge keeps up). Plug the controller in first.",
+                "joy"),
             new Preset("joy_node",
                 "ros2 run joy joy_node --ros-args -p coalesce_interval_ms:=50 -p autorepeat_rate:=20.0 -p deadzone:=0.08",
-                "Gamepad -> /joy via the joy package (Switch controllers need this one), also capped at ~20 Hz. Run one of the two, not both."),
+                "Gamepad -> /joy via the joy package (Switch controllers need this one), also capped at ~20 Hz. Starting it stops joy_linux_node: " +
+                "two drivers on /joy double the rate and mix two different axis layouts (joy and joy_linux number the sticks differently).",
+                "joy"),
             new Preset("drive_control_node", "ros2 run drive_control drive_control_node",
                 "RoverFlake2 gamepad drive: /joy -> /cmd_vel (left stick forward, right stick turn). Needs a joy node and wheel_speed_node."),
             new Preset("joy_arm_control", "ros2 run arm_control joy_arm_control",
@@ -83,6 +88,11 @@ namespace SimFlake.Ros
         {
             var n = Find(command);
             if (n != null && n.Running) return n;
+            // Exclusive presets (two joystick drivers on /joy): stop the others in the group first.
+            var preset = Array.Find(Presets, p => p.command == command);
+            if (preset?.group != null)
+                foreach (var p in Presets)
+                    if (p != preset && p.group == preset.group) { var o = Find(p.command); if (o != null && o.Running) { o.Add($"[stopped: {label} started]"); Stop(o); } }
             if (n == null) { n = new Node { label = label, command = command }; nodes.Add(n); }
             n.exitCode = int.MinValue; n.stopping = false;
             n.Add($"$ {command}");
