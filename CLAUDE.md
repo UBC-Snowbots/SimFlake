@@ -227,6 +227,9 @@ A rebuild rewrites ~40 MB of generated assets with new GUIDs, so commit rebuilds
 The centre terrain is soil (ruts, sinkage: see Soil model). A rebuild drops that: run `SimFlake > Soil > Add Soil To Badlands`
 (`SoilYardBuilder.AddSoilToBadlands`) afterwards.
 
+**URC rules** (where the PDF is, a summary of every mission, the astronaut tasks and command methods, what the sim models and
+what it doesn't, notes for the playable astronaut): **`claude/urc-rules.md`**. Read it before building anything task-related.
+
 `TaskWorlds/UrcAutonomySite` is the real place: the Utah state-owned square mile north of MDRS that the URC 2027 rules
 (1.e.xiii) name for the Autonomy Mission's route-finding sub-mission (38.411N -110.786E to 38.425N -110.768E), built from
 public data by `Editor/UrcSiteBuilder.cs` (menu `SimFlake > World Generation > Build URC Autonomy Site`, or `-executeMethod
@@ -308,9 +311,9 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
      must not change) and soil ms per step (tile creation gets slower, steady state should not).
   8. Update this section and the Soil model's "Known rough edges" (rocks would then be half done: stamped stones use the
      tyre model, loose stones and boulders still the PhysX sphere).
-- **Made up:** the task layout (URC publishes targets at the competition), following rules 1.e.iv-xvi: C2 + start gate on the
-  real URC staging area (vehicle tracks in the photo), mission start on flat ground, astronaut figure, rock pick hammer
-  (Rigidbody), drone pad, T1 on a clay ridge 420 m away (+16 m; 26-30 deg from most sides, 22 deg straight in from the
+- **Made up:** the task layout (URC publishes targets at the competition), following the rules (which rule each item is for:
+  `claude/urc-rules.md`): C2 + start gate on the real URC staging area (vehicle tracks in the photo), mission start on flat
+  ground, static astronaut figure, rock pick hammer (Rigidbody), drone pad, T1 on a clay ridge 420 m away (+16 m; 26-30 deg from most sides, 22 deg straight in from the
   south-west, 17 deg by the easiest winding route), T2 behind it without radio line of sight to the C2 mast. Also rocks
   under ~1 m (see above). Change the constants at the top of the builder and rebuild.
   Points are in `Worlds/UrcSite/waypoints.csv` (sim GNSS and true coordinates).
@@ -323,9 +326,8 @@ SimFlake.EditorTools.UrcSiteBuilder.BuildFromCommandLine [-screenshots <dir>]`, 
   `~/.local` breaks the system OpenCV. Then rebuild the world.
 - **Sizes:** generated assets 31 MB, scene 17 MB (5,000 boulder instances), source 24 MB. Splat maps are 2 m per texel because
   terrain assets are stored as text. A rebuild changes GUIDs: commit rebuilds sparingly.
-- **Not done:** the astronaut does not walk (follow / come need a moving figure); no LED indicator on the rover; cliffs are as smooth as a 1 m DEM makes them (no overhangs); soil has not been checked
-  against the ground. The other missions (delivery, equipment servicing, astrobiology) would be separate scenes; the URC
-  North site of the same lidar tile is the obvious place for a delivery course.
+- **Not done:** cliffs are as smooth as a 1 m DEM makes them (no overhangs); soil has not been checked against the ground.
+  Rules-related gaps (astronaut doesn't move or take commands, no LED, other missions' scenes): `claude/urc-rules.md`.
 
 ## In-game menu and cameras
 `Scripts/Tools/SimMenu.cs`: **Esc** in Play / a player opens a menu with five tabs plus ADVANCED. CONTROLS lists every hotkey except the menu's own
@@ -630,8 +632,10 @@ tools/drive_bench.sh                         # drivetrain test bench (no ROS), s
 For automated tests, use an isolated ROS graph so you don't publish onto the team's domain:
 `ROS_DOMAIN_ID=199 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`, start rosbridge yourself on a spare port, and pass `--rosbridge-url`.
 
-## Issue notes
-Detailed write-ups of investigated issues live in `claude/` (index: `claude/README.md`); add new ones there with a one-line pointer here.
+## Notes in `claude/`
+Detailed write-ups live in `claude/` (index: `claude/README.md`); add new ones there with a one-line pointer here.
+- `claude/urc-rules.md`: URC 2027 rules (source, summary, astronaut sub-mission), what the task worlds model.
+- `claude/rosbridge-camera-starvation.md`: fast `/cmd_vel` starved by camera streams; joystick-rate "phantom" driving.
 
 ## Gotchas found during the Jazzy migration
 - rosbridge's JSON (ujson) escapes `/` as `\/`. Envelope strings go through `RosJson.Unquote`; JsonUtility handles it in bodies.
